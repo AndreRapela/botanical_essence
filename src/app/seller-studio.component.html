@@ -1,0 +1,96 @@
+<div class="management-heading">
+  <p class="eyebrow">{{ copy('SELLER STUDIO', 'ESPACE VENDEUR') }}</p>
+  <h1>{{ copy('Cultivate your', 'Cultivez votre') }}<br><em>{{ copy('storefront.', 'boutique.') }}</em></h1>
+  <p>{{ copy('Manage store details, inventory and what appears in the marketplace.', 'Gérez votre boutique, votre stock et les produits publiés sur le marché.') }}</p>
+</div>
+
+@if (loading && !store) { <p class="catalog-status" role="status">{{ copy('Loading your shop…', 'Chargement de votre boutique…') }}</p> }
+@if (error) { <div class="form-notice error management-notice" role="alert">{{ error }}</div> }
+@if (success) { <div class="form-notice success management-notice" role="status">✓ {{ success }}</div> }
+
+@if (!loading && !store) {
+  <form class="management-card seller-onboarding" (ngSubmit)="saveStore.emit()">
+    <p class="eyebrow">{{ copy('START SELLING', 'COMMENCEZ À VENDRE') }}</p>
+    <h2>{{ copy('Create your seller profile', 'Créez votre profil vendeur') }}</h2>
+    <p>{{ copy('Tell the community about your collection. Your store will be reviewed before products become public.', 'Présentez votre collection. Votre boutique sera vérifiée avant la publication des produits.') }}</p>
+    <label class="field"><span>{{ copy('Store name', 'Nom de la boutique') }}</span><input name="onboardingStoreName" required minlength="2" maxlength="120" [(ngModel)]="storeForm.displayName"></label>
+    <label class="field"><span>{{ copy('Short description', 'Description courte') }}</span><textarea name="onboardingBio" rows="4" maxlength="1000" [(ngModel)]="storeForm.bio"></textarea></label>
+    <div class="field-grid location-field-grid">
+      <label class="field"><span>{{ copy('City', 'Ville') }}</span><input name="onboardingCity" required minlength="2" maxlength="100" [(ngModel)]="storeForm.city" [placeholder]="copy('Brussels', 'Bruxelles')"></label>
+      <label class="field"><span>{{ copy('Region', 'Région') }}</span><input name="onboardingRegion" required minlength="2" maxlength="100" [(ngModel)]="storeForm.region" [placeholder]="copy('Brussels-Capital', 'Bruxelles-Capitale')"></label>
+      <label class="field"><span>{{ copy('Country', 'Pays') }}</span><input name="onboardingCountry" required minlength="2" maxlength="100" [(ngModel)]="storeForm.country" [placeholder]="copy('Belgium', 'Belgique')"></label>
+    </div>
+    <button class="button button-green" type="submit" [disabled]="loading">{{ copy('Create seller profile', 'Créer le profil vendeur') }}</button>
+  </form>
+}
+
+@if (store) {
+  <div class="verification-banner" [class.verified]="store.verified">
+    <strong>{{ store.verified ? copy('Store approved', 'Boutique approuvée') : copy('Approval pending', 'Validation en attente') }}</strong>
+    <span>{{ store.verified ? copy('Active products are visible in the marketplace.', 'Les produits actifs sont visibles sur le marché.') : copy('You can prepare products now; they become public after review.', 'Préparez vos produits; ils seront publics après validation.') }}</span>
+  </div>
+  <div class="management-grid">
+    <form class="management-card store-profile-card" (ngSubmit)="saveStore.emit()">
+      <div class="management-card-intro">
+        <span class="management-card-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4zM3 10l2-6h14l2 6M8 20v-6h4v6"></path><path d="M7 10c0 1.5-1 2.5-2 2.5S3 11.5 3 10m8 0c0 1.5-1 2.5-2 2.5S7 11.5 7 10m8 0c0 1.5-1 2.5-2 2.5s-2-1-2-2.5m8 0c0 1.5-1 2.5-2 2.5s-2-1-2-2.5"></path></svg></span>
+        <div><p class="eyebrow">{{ copy('STORE PROFILE', 'PROFIL DE LA BOUTIQUE') }}</p><h2>{{ copy('Your public presence', 'Votre présence publique') }}</h2></div>
+      </div>
+      <p class="management-card-copy">{{ copy('Shape how customers discover and remember your shop.', 'Définissez la manière dont les clients découvrent votre boutique.') }}</p>
+      <label class="field"><span>{{ copy('Store name', 'Nom de la boutique') }}</span><input name="dashboardStoreName" required minlength="2" maxlength="120" [(ngModel)]="storeForm.displayName"></label>
+      <label class="field"><span>{{ copy('Short description', 'Description courte') }}</span><textarea name="dashboardBio" rows="4" maxlength="1000" [(ngModel)]="storeForm.bio"></textarea></label>
+      <div class="field-grid location-field-grid">
+        <label class="field"><span>{{ copy('City', 'Ville') }}</span><input name="dashboardCity" required minlength="2" maxlength="100" [(ngModel)]="storeForm.city"></label>
+        <label class="field"><span>{{ copy('Region', 'Région') }}</span><input name="dashboardRegion" required minlength="2" maxlength="100" [(ngModel)]="storeForm.region"></label>
+        <label class="field"><span>{{ copy('Country', 'Pays') }}</span><input name="dashboardCountry" required minlength="2" maxlength="100" [(ngModel)]="storeForm.country"></label>
+      </div>
+      <button class="button button-green management-submit" type="submit" [disabled]="loading">{{ copy('Save store', 'Enregistrer la boutique') }} <span>→</span></button>
+    </form>
+
+    <form id="seller-product-form" class="management-card product-editor-card" (ngSubmit)="submitProduct()">
+      <div class="management-card-intro">
+        <span class="management-card-mark product-form-preview sprite-{{ productForm.sprite }}" aria-hidden="true"></span>
+        <div><p class="eyebrow">{{ productForm.id ? copy('EDIT PRODUCT', 'MODIFIER LE PRODUIT') : copy('NEW PRODUCT', 'NOUVEAU PRODUIT') }}</p><h2>{{ productForm.id ? productForm.name : copy('Add to your collection', 'Ajoutez à votre collection') }}</h2></div>
+      </div>
+      <p class="management-card-copy">{{ copy('Add the details customers need to choose with confidence.', 'Ajoutez les détails nécessaires pour inspirer confiance.') }}</p>
+      <label class="field"><span>{{ copy('Product name', 'Nom du produit') }}</span><input name="productName" required minlength="2" maxlength="140" [(ngModel)]="productForm.name"></label>
+      <label class="field"><span>{{ copy('Description', 'Description') }}</span><textarea name="productDescription" rows="4" required minlength="10" maxlength="2000" [(ngModel)]="productForm.description"></textarea></label>
+      <div class="field-grid">
+        <label class="field"><span>{{ copy('Origin', 'Origine') }}</span><input name="productOrigin" maxlength="120" [(ngModel)]="productForm.origin" [placeholder]="copy('e.g. Brazil', 'ex. Brésil')"></label>
+        <label class="field"><span>{{ copy('Dimensions or volume', 'Dimensions ou volume') }}</span><input name="productDimensions" maxlength="120" [(ngModel)]="productForm.dimensions" [placeholder]="copy('e.g. approx. 65 × 35 cm', 'ex. env. 65 × 35 cm')"></label>
+      </div>
+      <label class="field"><span>{{ copy('Materials or composition', 'Matériaux ou composition') }}</span><input name="productMaterials" maxlength="200" [(ngModel)]="productForm.materials"></label>
+      <label class="field"><span>{{ copy('Care and usage instructions', 'Conseils d’entretien et d’utilisation') }}</span><textarea name="productCare" rows="3" maxlength="2000" [(ngModel)]="productForm.careInstructions"></textarea></label>
+      <div class="field-grid">
+        <label class="field"><span>{{ copy('Category', 'Catégorie') }}</span><select name="productCategory" [(ngModel)]="productForm.category"><option value="plants">{{ categoryLabel('plants') }}</option><option value="home">{{ categoryLabel('home') }}</option><option value="care">{{ categoryLabel('care') }}</option></select></label>
+        <label class="field"><span>{{ copy('Publication', 'Publication') }}</span><select name="productStatus" [(ngModel)]="productForm.status"><option value="draft">{{ copy('Draft', 'Brouillon') }}</option><option value="active" [disabled]="isUnapproved()">{{ isUnapproved() ? copy('Active (after approval)', 'Actif (après validation)') : copy('Active', 'Actif') }}</option></select></label>
+      </div>
+      <div class="field-grid">
+        <label class="field"><span>{{ copy('Base price (USD)', 'Prix de base (USD)') }}</span><input name="productPrice" type="number" required min="0.01" max="999999.99" step="0.01" [(ngModel)]="productForm.price"></label>
+        <label class="field"><span>{{ copy('Shipping weight (g)', 'Poids d’expédition (g)') }}</span><input name="productShippingWeight" type="number" required min="50" max="30000" step="50" [(ngModel)]="productForm.shippingWeightGrams"></label>
+      </div>
+      <div class="field-grid">
+        <label class="field"><span>{{ copy('Stock', 'Stock') }}</span><input name="productStock" type="number" required min="0" max="100000" step="1" [(ngModel)]="productForm.stock"></label>
+        <label class="field"><span>{{ copy('Visual', 'Visuel') }}</span><select name="productSprite" [(ngModel)]="productForm.sprite"><option [ngValue]="0">01</option><option [ngValue]="1">02</option><option [ngValue]="2">03</option><option [ngValue]="3">04</option></select></label>
+      </div>
+      <label class="field"><span>{{ copy('Badge (optional)', 'Badge (facultatif)') }}</span><input name="productBadge" maxlength="40" [(ngModel)]="productForm.badge"></label>
+      <div class="management-actions">
+        <button class="button button-green management-submit" type="submit" [disabled]="loading">{{ productForm.id ? copy('Update product', 'Mettre à jour') : copy('Create product', 'Créer le produit') }} <span>→</span></button>
+        @if (productForm.id) { <button class="button button-outline" type="button" (click)="resetProductForm.emit()">{{ copy('Cancel edit', 'Annuler') }}</button> }
+      </div>
+    </form>
+  </div>
+
+  <section class="managed-list">
+    <div class="managed-list-heading"><div><p class="eyebrow">{{ copy('INVENTORY', 'INVENTAIRE') }}</p><h2>{{ copy('Your products', 'Vos produits') }}</h2></div><span>{{ products.length }}</span></div>
+    @if (!products.length) { <p class="catalog-status">{{ copy('No products yet. Create your first draft above.', 'Aucun produit. Créez votre premier brouillon ci-dessus.') }}</p> }
+    @for (product of products; track product.id) {
+      <article class="managed-row">
+        <div class="managed-thumb sprite-{{ product.sprite }}"></div>
+        <div><strong>{{ product.name }}</strong><small>{{ categoryLabel(product.category) }} · {{ product.status === 'active' ? copy('Active', 'Actif') : copy('Draft', 'Brouillon') }}</small></div>
+        <span>{{ product.stock }} {{ copy('in stock', 'en stock') }}</span>
+        <b>{{ priceFormatter(product.price, 'USD') }}</b>
+        <div class="row-actions"><button type="button" (click)="editProduct.emit(product)">{{ copy('Edit', 'Modifier') }}</button><button class="danger-link" type="button" (click)="archiveProduct.emit(product)">{{ copy('Archive', 'Archiver') }}</button></div>
+      </article>
+    }
+  </section>
+}

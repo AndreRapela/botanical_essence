@@ -1,0 +1,20 @@
+<section class="checkout-pending-card" aria-live="polite" aria-labelledby="checkout-pending-title">
+  <p class="eyebrow">{{ copy('PAYMENT STATUS', 'ÉTAT DU PAIEMENT') }}</p>
+  <h2 id="checkout-pending-title">{{ copy('One order at a time.', 'Une commande à la fois.') }}</h2>
+  <p>{{ copy('This order is still being checked by the payment provider. We keep it locked so another click cannot create a duplicate order or reserve stock twice.', 'Le prestataire vérifie toujours cette commande. Elle reste verrouillée afin qu’un nouvel essai ne crée pas de doublon ni ne réserve le stock deux fois.') }}</p>
+  <div class="checkout-pending-reference">
+    <span>{{ copy('ORDER', 'COMMANDE') }} <strong>{{ orderNumber || copy('Checking…', 'Vérification…') }}</strong></span>
+    @if (orderTotal !== null) { <strong>{{ priceFormatter(orderTotal, currency) }}</strong> }
+  </div>
+  @if (error) { <div class="checkout-pending-error" role="status">{{ error }}</div> }
+  <div class="checkout-pending-actions">
+    <button class="button button-green" type="button" (click)="resume.emit()" [disabled]="statusLoading || verificationLoading || paymentStarting">
+      {{ resumeLabel }} →
+    </button>
+    @if (canCancel) {
+      <button class="button button-outline" type="button" (click)="cancel.emit()" [disabled]="statusLoading">
+        {{ orderCancelled ? copy('Close old payment', 'Fermer l’ancien paiement') : copy('Cancel this order', 'Annuler cette commande') }}
+      </button>
+    }
+  </div>
+</section>

@@ -1,0 +1,15 @@
+.payment-provider-choice { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 20px 0; }
+.payment-provider-choice label { align-items: center; background: rgba(255,255,255,.75); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; display: grid; gap: 12px; grid-template-columns: 38px minmax(0, 1fr) 20px; min-height: 82px; padding: 14px; transition: border-color .2s, background .2s, box-shadow .2s; }
+.payment-provider-choice label.active { background: #fff; border-color: var(--green-700); box-shadow: 0 0 0 3px rgba(76,98,61,.08); }
+.payment-provider-choice label.disabled { cursor: not-allowed; opacity: .56; }
+.payment-provider-choice input { height: 1px; opacity: 0; position: absolute; width: 1px; }
+.payment-provider-choice label > span:nth-of-type(2) strong, .payment-provider-choice label > span:nth-of-type(2) small { display: block; }
+.payment-provider-choice label > span:nth-of-type(2) small { color: #4f584b; font-size: 10px; margin-top: 4px; }
+.payment-provider-choice label > b { color: var(--green-700); }
+.payment-provider-choice label:focus-within { outline: 2px solid var(--green-700); outline-offset: 3px; }
+.payment-method-icon { align-items: center; background: var(--cream); border-radius: 10px; color: var(--green-700); display: flex; font-size: 19px; height: 34px; justify-content: center; width: 34px; }
+.payment-method-icon-bancontact { background: #fff1b8; color: #1c201b; font-size: 10px; font-weight: 800; letter-spacing: -.04em; }
+
+@media (max-width: 760px) {
+  .payment-provider-choice { grid-template-columns: 1fr; }
+}

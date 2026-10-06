@@ -1,0 +1,24 @@
+:host { display: block; margin-top: 34px; }
+.notification-queue { background: rgba(255,255,255,.86); border: 1px solid rgba(112,73,27,.19); border-radius: 24px; box-shadow: 0 18px 55px rgba(35,48,28,.07); overflow: hidden; padding: clamp(22px, 3vw, 40px); }
+.queue-heading { align-items: center; display: flex; justify-content: space-between; }
+.queue-heading p { color: #8a6332; font-size: 10px; letter-spacing: .2em; margin: 0; }
+.queue-heading h2 { color: #18321e; font-family: Georgia, serif; font-size: clamp(29px, 2.8vw, 42px); font-weight: 400; margin: 8px 0 26px; }
+.queue-heading > span { align-items: center; background: #8a3d25; border-radius: 50%; color: #fff; display: flex; font-size: 13px; height: 44px; justify-content: center; min-width: 44px; padding: 0 6px; }
+.notification-row { align-items: start; border-top: 1px solid rgba(38,54,31,.12); display: grid; gap: 18px; grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.5fr) auto; padding: 20px 0; }
+.notification-order, .notification-state { display: grid; gap: 7px; min-width: 0; }
+.notification-order small, .notification-state small { color: #687163; font-size: 11px; overflow-wrap: anywhere; }
+.notification-order a { color: inherit; }
+.state-pill { background: #f5eddb; border: 1px solid #e2d4b1; border-radius: 999px; color: #6a552a; display: inline-flex; font-size: 10px; justify-self: start; letter-spacing: .08em; padding: 6px 10px; text-transform: uppercase; }
+.state-pill.failed { background: #f9ebe5; border-color: #e7c8ba; color: #813f2b; }
+.delivery-error { background: #faf3f0; border-left: 2px solid #b46a50; color: #704637 !important; line-height: 1.5; padding: 9px 11px; }
+.notification-row button, .load-more { align-self: center; background: #31482a; border: 0; border-radius: 999px; color: white; cursor: pointer; font: inherit; font-size: 12px; min-height: 44px; padding: 10px 17px; }
+.notification-row button:disabled, .load-more:disabled { cursor: wait; opacity: .6; }
+.locked-note { align-self: center; color: #687163; font-size: 11px; max-width: 150px; }
+.load-more { margin-top: 12px; }
+.notice { background: #f6f1e4; border: 1px solid #e5d8b7; color: #675d45; font-size: 11px; line-height: 1.65; margin: 18px 0 0; padding: 14px 16px; }
+.empty { color: #687163; padding: 12px 0; }
+@media (max-width: 700px) {
+  .notification-row { gap: 12px; grid-template-columns: 1fr; }
+  .notification-row button, .locked-note { justify-self: start; }
+  .queue-heading h2 { font-size: 30px; }
+}

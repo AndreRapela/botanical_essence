@@ -1,0 +1,48 @@
+<section class="purchase-final" aria-labelledby="purchase-final-title">
+  <div class="purchase-final-copy">
+    <p class="eyebrow">{{ copy('FINAL REVIEW', 'VÉRIFICATION FINALE') }}</p>
+    <h2 id="purchase-final-title">{{ copy('Everything looks right?', 'Tout est correct ?') }}</h2>
+    <p>{{ copy('Review your products, delivery address, bpost option and payment method above. When you are ready, confirm the full amount below.', 'Vérifiez vos produits, votre adresse, l’option bpost et le mode de paiement ci-dessus. Lorsque vous êtes prêt, confirmez le montant total ci-dessous.') }}</p>
+    <p class="withdrawal-checkout-note">
+      {{ copy('Eligible distance purchases may be withdrawn within 14 days after receipt, without giving a reason. Product-specific legal exceptions are reviewed individually; see the', 'Les achats à distance éligibles peuvent faire l’objet d’une rétractation dans les 14 jours suivant la réception, sans justification. Les exceptions légales sont évaluées au cas par cas; consultez la') }}
+      <button type="button" (click)="openReturns.emit()">{{ copy('returns and withdrawal process', 'procédure de rétractation et de retour') }}</button>.
+    </p>
+  </div>
+
+  <div class="purchase-final-facts">
+    <div><small>{{ copy('ITEMS', 'ARTICLES') }}</small><strong>{{ itemCount }}</strong></div>
+    <div><small>{{ copy('DELIVERY', 'LIVRAISON') }}</small><strong>{{ deliveryLabel }}</strong></div>
+    <div><small>{{ copy('PAYMENT', 'PAIEMENT') }}</small><strong>{{ paymentMethodLabel }}</strong></div>
+    <div class="purchase-final-total"><small>{{ copy('FINAL TOTAL', 'TOTAL FINAL') }}</small><strong>{{ totalLabel }}</strong></div>
+  </div>
+
+  @if (checkoutError) {
+    <div class="purchase-validation-error" role="alert">{{ checkoutError }}</div>
+  }
+  @if (paymentStarting) {
+    <div class="payment-preview-feedback" role="status">
+      <span aria-hidden="true">◌</span>
+      <p><strong>{{ copy('Opening secure payment…', 'Ouverture du paiement sécurisé…') }}</strong><small>{{ copy('Your order is being validated and reserved.', 'Votre commande est en cours de validation et de réservation.') }}</small></p>
+    </div>
+  }
+  @if (paymentVerificationLoading) {
+    <div class="payment-preview-feedback" role="status">
+      <span aria-hidden="true">◌</span>
+      <p><strong>{{ copy('Verifying payment…', 'Vérification du paiement…') }}</strong><small>{{ copy('We are checking the payment confirmation with the provider.', 'Nous vérifions la confirmation auprès du prestataire.') }}</small></p>
+    </div>
+  }
+
+  <button class="purchase-final-button" type="button" (click)="startPurchase.emit()" [disabled]="purchaseDisabled">
+    <span class="purchase-final-button-label">
+      @if (hasShippingQuote) {
+        <small>{{ copy('CONFIRM YOUR ORDER', 'CONFIRMEZ VOTRE COMMANDE') }}</small>
+        <strong>{{ paymentStarting ? copy('Opening secure checkout…', 'Ouverture du paiement…') : copy('Continue to secure payment', 'Continuer vers le paiement sécurisé') }}</strong>
+      } @else {
+        <small>{{ copy('ONE STEP LEFT', 'DERNIÈRE ÉTAPE') }}</small>
+        <strong>{{ copy('Calculate delivery to continue', 'Calculez la livraison pour continuer') }}</strong>
+      }
+    </span>
+    <span class="purchase-final-button-price">{{ totalLabel }}</span>
+    <span class="purchase-final-button-arrow" aria-hidden="true">→</span>
+  </button>
+</section>

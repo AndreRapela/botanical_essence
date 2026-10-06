@@ -1,0 +1,88 @@
+name: Quality gates
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      APP_ENV: development
+      APP_URL: http://localhost:4300
+      CORS_ALLOWED_ORIGINS: http://localhost:4300
+      # Only the disposable CI database enables seeded role accounts so that
+      # authenticated customer/admin/seller flows are exercised by tests.
+      ENABLE_DEMO_ACCOUNTS: "true"
+      REQUIRE_DEMO_AUTH_TESTS: "true"
+      # This workflow starts a clean, disposable database; no real order or PSP is used.
+      ALLOW_TEST_ORDER_CREATION: "true"
+      PAYMENT_EXECUTION_MODE: local_simulation
+      PAYMENT_TEST_MODE: "true"
+      MAIL_TRANSPORT: log
+      DB_DATABASE: botanical_essence_ci
+      DB_USERNAME: botanical_ci
+      DB_PASSWORD: ci-only-not-a-secret
+      DB_ROOT_PASSWORD: ci-root-only-not-a-secret
+      ALLOW_DISPOSABLE_DB_TESTS: "true"
+      STRIPE_SECRET_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      STRIPE_ACCOUNT_ID: ""
+      STRIPE_SETTLEMENT_CURRENCY: ""
+      STRIPE_PAYMENT_LIMITS_JSON: ""
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check dependency advisories
+        run: npm audit --audit-level=high
+
+      - name: Install browsers for browser tests
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Start isolated application stack
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Run static, frontend, backend, and HTTP integration gates
+        run: npm run verify:full
+
+      - name: Run responsive and authenticated browser journeys
+        run: npm run test:e2e
+
+      - name: Stop application stack
+        if: always()
+        run: docker compose down --remove-orphans
+
+  windows-backup-acl:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Verify Windows backup directory ACL enforcement
+        run: node --test --test-name-pattern="Windows backup" scripts/mysql-backup.test.mjs

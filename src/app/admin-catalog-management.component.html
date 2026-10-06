@@ -1,0 +1,109 @@
+@if (editingUser) {
+  <form id="admin-user-editor" class="management-card admin-editor" (ngSubmit)="saveUser.emit()">
+    <p class="eyebrow">{{ copy('EDIT ACCOUNT', 'MODIFIER LE COMPTE') }}</p>
+    <h2>{{ editingUser.name }}</h2>
+    @if (editingUser.isDemo) {
+      <div class="form-notice">{{ copy('Demo accounts are protected and reset automatically.', 'Les comptes de démonstration sont protégés.') }}</div>
+    }
+    <div class="form-notice">{{ copy('A changed email is never treated as verified. The account will wait for confirmation at the new address.', 'Une nouvelle adresse n’est jamais considérée comme vérifiée automatiquement. Le compte restera en attente jusqu’à sa confirmation.') }}</div>
+    <div class="field-grid">
+      <label class="field"><span>{{ copy('Full name', 'Nom complet') }}</span><input name="adminUserName" required minlength="2" maxlength="120" [(ngModel)]="userForm.name"></label>
+      <label class="field"><span>{{ copy('Email', 'E-mail') }}</span><input name="adminUserEmail" type="email" required [(ngModel)]="userForm.email"></label>
+    </div>
+    <div class="field-grid">
+      <label class="field"><span>{{ copy('Role', 'Rôle') }}</span><select name="adminUserRole" [(ngModel)]="userForm.role"><option value="customer">{{ copy('Customer', 'Client') }}</option><option value="seller">{{ copy('Seller', 'Vendeur') }}</option><option value="admin">{{ copy('Administrator', 'Administrateur') }}</option></select></label>
+      <label class="field"><span>{{ copy('Status', 'Statut') }}</span><select name="adminUserStatus" [(ngModel)]="userForm.status"><option value="pending">{{ copy('Pending', 'En attente') }}</option><option value="active">{{ copy('Active', 'Actif') }}</option><option value="disabled">{{ copy('Disabled', 'Désactivé') }}</option></select></label>
+    </div>
+    <label class="terms"><input type="checkbox" name="adminUserVerified" [(ngModel)]="userForm.emailVerified"><span>{{ copy('Email verified', 'E-mail vérifié') }}</span></label>
+    <div class="management-actions">
+      <button class="button button-green" type="submit" [disabled]="loading || editingUser.isDemo">{{ copy('Save account', 'Enregistrer le compte') }}</button>
+      <button class="button button-outline" type="button" (click)="cancelUserEdit.emit()">{{ copy('Cancel', 'Annuler') }}</button>
+    </div>
+  </form>
+}
+
+@if (editingProduct) {
+  <form id="admin-product-editor" class="management-card admin-editor" (ngSubmit)="saveProduct.emit()">
+    <p class="eyebrow">{{ copy('EDIT ANY PRODUCT', 'MODIFIER UN PRODUIT') }}</p>
+    <h2>{{ editingProduct.name }}</h2>
+    <p>{{ copy('Seller:', 'Vendeur :') }} {{ editingProduct.sellerName }}</p>
+    <label class="field"><span>{{ copy('Product name', 'Nom du produit') }}</span><input name="adminProductName" required minlength="2" maxlength="140" [(ngModel)]="productForm.name"></label>
+    <label class="field"><span>{{ copy('Description', 'Description') }}</span><textarea name="adminProductDescription" rows="4" required minlength="10" maxlength="2000" [(ngModel)]="productForm.description"></textarea></label>
+    <div class="field-grid">
+      <label class="field"><span>{{ copy('Origin', 'Origine') }}</span><input name="adminProductOrigin" maxlength="120" [(ngModel)]="productForm.origin"></label>
+      <label class="field"><span>{{ copy('Dimensions or volume', 'Dimensions ou volume') }}</span><input name="adminProductDimensions" maxlength="120" [(ngModel)]="productForm.dimensions"></label>
+    </div>
+    <label class="field"><span>{{ copy('Materials or composition', 'Matériaux ou composition') }}</span><input name="adminProductMaterials" maxlength="200" [(ngModel)]="productForm.materials"></label>
+    <label class="field"><span>{{ copy('Care and usage instructions', 'Conseils d’entretien et d’utilisation') }}</span><textarea name="adminProductCare" rows="3" maxlength="2000" [(ngModel)]="productForm.careInstructions"></textarea></label>
+    <div class="field-grid">
+      <label class="field"><span>{{ copy('Category', 'Catégorie') }}</span><select name="adminProductCategory" [(ngModel)]="productForm.category"><option value="plants">{{ categoryLabel('plants') }}</option><option value="home">{{ categoryLabel('home') }}</option><option value="care">{{ categoryLabel('care') }}</option></select></label>
+      <label class="field"><span>{{ copy('Status', 'Statut') }}</span><select name="adminProductStatus" [(ngModel)]="productForm.status"><option value="draft">{{ copy('Draft', 'Brouillon') }}</option><option value="active">{{ copy('Active', 'Actif') }}</option><option value="archived">{{ copy('Archived', 'Archivé') }}</option></select></label>
+    </div>
+    <div class="field-grid">
+      <label class="field"><span>{{ copy('Base price (USD)', 'Prix de base (USD)') }}</span><input name="adminProductPrice" type="number" required min="0.01" max="999999.99" step="0.01" [(ngModel)]="productForm.price"></label>
+      <label class="field"><span>{{ copy('Shipping weight (g)', 'Poids d’expédition (g)') }}</span><input name="adminProductShippingWeight" type="number" required min="50" max="30000" step="50" [(ngModel)]="productForm.shippingWeightGrams"></label>
+    </div>
+    <div class="field-grid">
+      <label class="field"><span>{{ copy('Stock', 'Stock') }}</span><input name="adminProductStock" type="number" required min="0" max="100000" step="1" [(ngModel)]="productForm.stock"></label>
+      <label class="field"><span>{{ copy('Visual', 'Visuel') }}</span><select name="adminProductSprite" [(ngModel)]="productForm.sprite"><option [ngValue]="0">01</option><option [ngValue]="1">02</option><option [ngValue]="2">03</option><option [ngValue]="3">04</option></select></label>
+    </div>
+    <label class="field"><span>{{ copy('Badge', 'Badge') }}</span><input name="adminProductBadge" maxlength="40" [(ngModel)]="productForm.badge"></label>
+    <div class="admin-checks">
+      <label class="terms"><input type="checkbox" name="adminProductMarketplace" [(ngModel)]="productForm.marketplace"><span>{{ copy('Marketplace item', 'Article du marché') }}</span></label>
+      <label class="terms"><input type="checkbox" name="adminProductFeatured" [(ngModel)]="productForm.featured"><span>{{ copy('Featured product', 'Produit en vedette') }}</span></label>
+    </div>
+    <div class="management-actions">
+      <button class="button button-green" type="submit" [disabled]="loading">{{ copy('Save product', 'Enregistrer le produit') }}</button>
+      <button class="button button-outline" type="button" (click)="cancelProductEdit.emit()">{{ copy('Cancel', 'Annuler') }}</button>
+    </div>
+  </form>
+}
+
+@if (editingStore) {
+  <form id="admin-store-editor" class="management-card admin-editor" (ngSubmit)="saveStore.emit()">
+    <p class="eyebrow">{{ copy('EDIT STORE', 'MODIFIER LA BOUTIQUE') }}</p>
+    <h2>{{ editingStore.displayName }}</h2>
+    <label class="field"><span>{{ copy('Store name', 'Nom de la boutique') }}</span><input name="adminStoreName" required minlength="2" maxlength="120" [(ngModel)]="storeForm.displayName"></label>
+    <label class="field"><span>{{ copy('Description', 'Description') }}</span><textarea name="adminStoreBio" rows="4" maxlength="1000" [(ngModel)]="storeForm.bio"></textarea></label>
+    <div class="field-grid location-field-grid">
+      <label class="field"><span>{{ copy('City', 'Ville') }}</span><input name="adminStoreCity" required minlength="2" maxlength="100" [(ngModel)]="storeForm.city"></label>
+      <label class="field"><span>{{ copy('Region', 'Région') }}</span><input name="adminStoreRegion" required minlength="2" maxlength="100" [(ngModel)]="storeForm.region"></label>
+      <label class="field"><span>{{ copy('Country', 'Pays') }}</span><input name="adminStoreCountry" required minlength="2" maxlength="100" [(ngModel)]="storeForm.country"></label>
+    </div>
+    <div class="management-actions">
+      <button class="button button-green" type="submit" [disabled]="loading">{{ copy('Save store', 'Enregistrer la boutique') }}</button>
+      <button class="button button-outline" type="button" (click)="cancelStoreEdit.emit()">{{ copy('Cancel', 'Annuler') }}</button>
+    </div>
+  </form>
+}
+
+<section class="managed-list admin-list" aria-labelledby="admin-users-heading">
+  <div class="managed-list-heading"><div><p class="eyebrow">{{ copy('USER ACCOUNTS', 'COMPTES UTILISATEURS') }}</p><h2 id="admin-users-heading">{{ copy('All accounts', 'Tous les comptes') }}</h2></div><span>{{ usersTotal }}</span></div>
+  @for (account of users; track account.id) {
+    <article class="managed-row admin-row"><div class="seller-initial">{{ account.name.charAt(0) }}</div><div><strong>{{ account.name }}</strong><small>{{ account.email }} · {{ account.role }} @if (account.isDemo) { · DEMO }</small></div><span>{{ account.emailVerified ? copy('Verified email', 'E-mail vérifié') : copy('Unverified', 'Non vérifié') }}</span><b [class.approved]="account.status === 'active'">{{ account.status }}</b><div class="row-actions"><button type="button" (click)="editUser.emit(account)">{{ copy('Edit', 'Modifier') }}</button></div></article>
+  }
+</section>
+
+<section class="managed-list admin-list" aria-labelledby="admin-products-heading">
+  <div class="managed-list-heading"><div><p class="eyebrow">{{ copy('ALL PRODUCTS', 'TOUS LES PRODUITS') }}</p><h2 id="admin-products-heading">{{ copy('Catalog and marketplace', 'Catalogue et marché') }}</h2></div><span>{{ productsTotal }}</span></div>
+  @for (product of products; track product.id) {
+    <article class="managed-row"><div class="managed-thumb sprite-{{ product.sprite }}"></div><div><strong>{{ product.name }}</strong><small>{{ product.sellerName }} · {{ product.status }} · {{ product.marketplace ? copy('Marketplace', 'Marché') : copy('Main shop', 'Boutique') }}</small></div><span>{{ product.stock }} {{ copy('in stock', 'en stock') }}</span><b>{{ priceFormatter(product.price, 'USD') }}</b><div class="row-actions"><button type="button" (click)="editProduct.emit(product)">{{ copy('Edit', 'Modifier') }}</button></div></article>
+  }
+</section>
+
+<section class="managed-list admin-list review-admin-list" aria-labelledby="admin-reviews-heading">
+  <div class="managed-list-heading"><div><p class="eyebrow">{{ copy('CUSTOMER REVIEWS', 'AVIS CLIENTS') }}</p><h2 id="admin-reviews-heading">{{ copy('Comment moderation', 'Modération des commentaires') }}</h2></div><span>{{ reviewsTotal }}</span></div>
+  @if (!reviews.length) { <p class="catalog-status">{{ copy('No reviews yet.', 'Aucun avis pour le moment.') }}</p> }
+  @for (review of reviews; track review.id) {
+    <article class="admin-review-row"><div class="admin-review-meta"><strong>{{ review.productName }}</strong><span class="review-stars" aria-hidden="true">{{ ratingStars(review.rating) }}</span><small>{{ review.authorName }} · {{ review.authorEmail }}</small></div><p>{{ review.comment }}</p><div class="admin-review-state"><b [class.approved]="review.status === 'visible'">{{ review.status === 'visible' ? copy('Visible', 'Visible') : copy('Hidden', 'Masqué') }}</b><button type="button" [disabled]="loading" (click)="moderateReview.emit({ review, status: review.status === 'visible' ? 'hidden' : 'visible' })">{{ review.status === 'visible' ? copy('Hide', 'Masquer') : copy('Restore', 'Restaurer') }}</button></div></article>
+  }
+  @if (overviewHasMore) { <button class="button button-outline" type="button" [disabled]="loading" (click)="loadMoreOverview.emit()">{{ loading ? copy('Loading…', 'Chargement…') : copy('Load more accounts, products and reviews', 'Charger plus de comptes, produits et avis') }}</button> }
+</section>
+
+<section class="managed-list admin-list" aria-labelledby="admin-sellers-heading">
+  <div class="managed-list-heading"><div><p class="eyebrow">{{ copy('SELLER ACCOUNTS', 'COMPTES VENDEURS') }}</p><h2 id="admin-sellers-heading">{{ copy('Approval queue', 'File de validation') }}</h2></div><span>{{ sellersTotal }}</span></div>
+  @for (seller of sellers; track seller.id) {
+    <article class="managed-row admin-row"><div class="seller-initial">{{ seller.displayName.charAt(0) }}</div><div><strong>{{ seller.displayName }}</strong><small>{{ seller.ownerName }} · {{ seller.email }} · {{ seller.city }}, {{ seller.region }} · {{ seller.country }}</small></div><span>{{ seller.productCount }} {{ copy('product(s)', 'produit(s)') }}</span><b [class.approved]="seller.verified">{{ seller.verified ? copy('Approved', 'Approuvé') : copy('Pending', 'En attente') }}</b><div class="row-actions"><button type="button" (click)="editStore.emit(seller)">{{ copy('Edit', 'Modifier') }}</button><button type="button" [disabled]="loading" (click)="verifySeller.emit({ seller, verified: !seller.verified })">{{ seller.verified ? copy('Remove approval', 'Retirer') : copy('Approve', 'Approuver') }}</button></div></article>
+  }
+  @if (sellersHasMore) { <button class="button button-outline" type="button" [disabled]="loading" (click)="loadMoreSellers.emit()">{{ loading ? copy('Loading…', 'Chargement…') : copy('Load more seller accounts', 'Charger plus de comptes vendeurs') }}</button> }
+</section>

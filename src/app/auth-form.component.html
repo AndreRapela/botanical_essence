@@ -1,0 +1,78 @@
+<div class="auth-form-component">
+  <div class="auth-form-wrap">
+    <button class="auth-back" type="button" (click)="navigateHome.emit()">← {{ copy('Back to the shop', 'Retour à la boutique') }}</button>
+    @if (authMode === 'login' || authMode === 'register') {
+      <div class="auth-tabs" role="group" [attr.aria-label]="copy('Account access options', 'Options d’accès au compte')"><button type="button" [class.active]="authMode === 'login'" [attr.aria-pressed]="authMode === 'login'" (click)="switchAuth.emit('login')">{{ copy('Sign in', 'Connexion') }}</button><button type="button" [class.active]="authMode === 'register'" [attr.aria-pressed]="authMode === 'register'" (click)="switchAuth.emit('register')">{{ copy('Create account', 'Créer un compte') }}</button></div>
+    }
+    @if (authMode === 'login') {
+      <form class="auth-form" (ngSubmit)="submitLogin.emit()">
+        <div class="form-heading"><p class="eyebrow">{{ copy('WELCOME BACK', 'BON RETOUR') }}</p><h1>{{ copy('Sign in to your', 'Retrouvez votre') }}<br><em>{{ copy('botanical space.', 'espace botanique.') }}</em></h1><p>{{ copy('Your favorites, orders and seller tools are waiting.', 'Vos favoris, commandes et outils vendeur vous attendent.') }}</p></div>
+        @if (authError) { <div class="form-notice error" role="alert">{{ authError }}</div> }
+        @if (authSuccess) { <div class="form-notice success" role="status">✓ {{ authSuccess }}</div> }
+        <label class="field"><span>{{ copy('Email address', 'Adresse e-mail') }}</span><input name="loginEmail" type="email" autocomplete="email" required [(ngModel)]="loginForm.email" placeholder="you@email.com"></label>
+        <label class="field"><span>{{ copy('Password', 'Mot de passe') }}</span><div class="password-field"><input name="loginPassword" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" required [(ngModel)]="loginForm.password" placeholder="••••••••"><button type="button" (click)="showPasswordChange.emit(!showPassword)" [attr.aria-label]="copy('Show password', 'Afficher le mot de passe')">{{ showPassword ? '×' : '○' }}</button></div></label>
+        <div class="form-options"><label><input type="checkbox" name="rememberMe" [ngModel]="rememberMe" (ngModelChange)="rememberMeChange.emit($event)"> {{ copy('Remember me', 'Se souvenir de moi') }}</label><button type="button" (click)="switchAuth.emit('forgot')">{{ copy('Forgot password?', 'Mot de passe oublié ?') }}</button></div>
+        <button class="button button-green submit-button" type="submit" [disabled]="authLoading">{{ authLoading ? copy('Signing in…', 'Connexion…') : copy('Sign in', 'Se connecter') }} <span>→</span></button>
+        @if (demoAccounts.length) {
+          <div class="demo-login"><small>{{ copy('LOCAL DEMONSTRATION', 'DÉMONSTRATION LOCALE') }}</small><div>@for (account of demoAccounts; track account.role) { <button class="button button-outline" type="button" [disabled]="authLoading" (click)="loginAsDemo.emit(account.role)">{{ account.role === 'admin' ? copy('Enter as administrator', 'Entrer comme administrateur') : account.role === 'seller' ? copy('Enter as seller', 'Entrer comme vendeur') : copy('Enter as user', 'Entrer comme utilisateur') }}</button> }</div><p>{{ copy('One-click access is available only in the development environment.', 'L’accès en un clic est disponible uniquement en développement.') }}</p></div>
+        }
+        <p class="auth-switch-copy">{{ copy('New here?', 'Nouveau ici ?') }} <button type="button" (click)="switchAuth.emit('register')">{{ copy('Create your account', 'Créez votre compte') }}</button></p>
+      </form>
+    } @else if (authMode === 'register') {
+      <form class="auth-form register-form" (ngSubmit)="submitRegister.emit()">
+        <div class="form-heading"><p class="eyebrow">{{ copy('PLANT A NEW BEGINNING', 'PLANTEZ UN NOUVEAU DÉPART') }}</p><h1>{{ copy('Create your', 'Créez votre') }}<br><em>{{ copy('botanical space.', 'espace botanique.') }}</em></h1><p>{{ copy('Choose how you would like to be part of the community.', 'Choisissez comment vous souhaitez rejoindre la communauté.') }}</p></div>
+        @if (authError) { <div class="form-notice error" role="alert">{{ authError }}</div> }
+        @if (authSuccess) { <div class="form-notice success" role="status">✓ {{ authSuccess }}</div> }
+        @if (authActionUrl) { <button class="button button-outline dev-action" type="button" (click)="openAuthAction.emit()">{{ copy('Open local verification link', 'Ouvrir le lien local de vérification') }}</button> }
+        <div class="role-picker"><button type="button" [class.active]="registerForm.role === 'customer'" (click)="registerForm.role = 'customer'"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-5 4-7 8-7s7 2 8 7"></path></svg><span><strong>{{ copy('I want to buy', 'Je souhaite acheter') }}</strong><small>{{ copy('Customer account', 'Compte client') }}</small></span></button><button type="button" [class.active]="registerForm.role === 'seller'" (click)="registerForm.role = 'seller'"><svg viewBox="0 0 24 24"><path d="M3 9h18l-2-5H5L3 9Zm2 0v11h14V9"></path></svg><span><strong>{{ copy('I want to sell', 'Je souhaite vendre') }}</strong><small>{{ copy('Seller account', 'Compte vendeur') }}</small></span></button></div>
+        <div class="register-field-grid">
+          <label class="field"><span>{{ copy('Full name', 'Nom complet') }}</span><input name="registerName" type="text" autocomplete="name" required [(ngModel)]="registerForm.name" [placeholder]="copy('How should we call you?', 'Comment devons-nous vous appeler ?')"></label>
+          <label class="field"><span>{{ copy('Email address', 'Adresse e-mail') }}</span><input name="registerEmail" type="email" autocomplete="email" required [(ngModel)]="registerForm.email" placeholder="you@email.com"></label>
+          <label class="field"><span>{{ copy('Create a password', 'Créez un mot de passe') }}</span><div class="password-field"><input name="registerPassword" [type]="showPassword ? 'text' : 'password'" autocomplete="new-password" required minlength="12" maxlength="128" [(ngModel)]="registerForm.password" placeholder="••••••••••••"><button type="button" (click)="showPasswordChange.emit(!showPassword)" [attr.aria-label]="copy('Show password', 'Afficher le mot de passe')">{{ showPassword ? '×' : '○' }}</button></div></label>
+          <label class="field"><span>{{ copy('Confirm password', 'Confirmez le mot de passe') }}</span><input name="confirmPassword" [type]="showPassword ? 'text' : 'password'" autocomplete="new-password" required [(ngModel)]="registerForm.confirmPassword" placeholder="••••••••"></label>
+          @if (registerForm.role === 'seller') {
+            <label class="field"><span>{{ copy('Store name', 'Nom de la boutique') }}</span><input name="storeName" required maxlength="120" [(ngModel)]="registerForm.storeName"></label>
+            <label class="field"><span>{{ copy('City', 'Ville') }}</span><input name="sellerCity" required maxlength="100" [(ngModel)]="registerForm.city"></label>
+            <label class="field"><span>{{ copy('Region', 'Région') }}</span><input name="sellerRegion" required minlength="2" maxlength="100" [(ngModel)]="registerForm.region" [placeholder]="copy('Brussels-Capital', 'Bruxelles-Capitale')"></label>
+            <label class="field"><span>{{ copy('Country', 'Pays') }}</span><input name="sellerCountry" required minlength="2" maxlength="100" [(ngModel)]="registerForm.country" [placeholder]="copy('Belgium', 'Belgique')"></label>
+          }
+        </div>
+        <div class="password-meter" [attr.data-strength]="passwordStrength"><span></span><span></span><span></span><span></span><small>{{ copy('Use 12+ characters, uppercase, lowercase, a number and a symbol.', 'Utilisez 12+ caractères, majuscule, minuscule, chiffre et symbole.') }}</small></div>
+        <label class="terms"><input type="checkbox" name="acceptTerms" [(ngModel)]="registerForm.acceptTerms"> <span>{{ copy('I agree to the', 'J’accepte les') }} <a href="/terms">{{ copy('Terms of Use', 'Conditions d’utilisation') }}</a> {{ copy('and', 'et la') }} <a href="/privacy">{{ copy('Privacy Policy', 'Politique de confidentialité') }}</a>.</span></label>
+        <button class="button button-green submit-button" type="submit" [disabled]="authLoading">{{ authLoading ? copy('Creating account…', 'Création…') : copy('Create my account', 'Créer mon compte') }} <span>→</span></button>
+      </form>
+    } @else if (authMode === 'forgot') {
+      <form class="auth-form forgot-form" (ngSubmit)="submitForgotPassword.emit()">
+        <button class="auth-back inline" type="button" (click)="switchAuth.emit('login')">← {{ copy('Back to sign in', 'Retour à la connexion') }}</button>
+        <div class="form-heading"><span class="round-icon">✦</span><p class="eyebrow">{{ copy('RECOVER YOUR ACCESS', 'RÉCUPÉREZ VOTRE ACCÈS') }}</p><h1>{{ copy('A small reset,', 'Une petite réinitialisation,') }}<br><em>{{ copy('then keep growing.', 'puis continuez à grandir.') }}</em></h1><p>{{ copy('Enter the email used for your account. We will send secure recovery instructions.', 'Saisissez l’e-mail de votre compte. Nous vous enverrons des instructions sécurisées.') }}</p></div>
+        @if (authError) { <div class="form-notice error" role="alert">{{ authError }}</div> }
+        @if (authSuccess) { <div class="form-notice success" role="status">✓ {{ authSuccess }}</div> }
+        @if (authActionUrl) { <button class="button button-outline dev-action" type="button" (click)="openAuthAction.emit()">{{ copy('Open local reset link', 'Ouvrir le lien local de réinitialisation') }}</button> }
+        <label class="field"><span>{{ copy('Email address', 'Adresse e-mail') }}</span><input name="forgotEmail" type="email" autocomplete="email" required [ngModel]="forgotEmail" (ngModelChange)="forgotEmailChange.emit($event)" placeholder="you@email.com"></label>
+        <button class="button button-green submit-button" type="submit" [disabled]="authLoading">{{ authLoading ? copy('Sending…', 'Envoi…') : copy('Send recovery link', 'Envoyer le lien') }} <span>→</span></button>
+      </form>
+    } @else if (authMode === 'reset') {
+      <form class="auth-form forgot-form" (ngSubmit)="submitResetPassword.emit()">
+        <button class="auth-back inline" type="button" (click)="switchAuth.emit('login')">← {{ copy('Back to sign in', 'Retour à la connexion') }}</button>
+        <div class="form-heading"><span class="round-icon">✦</span><p class="eyebrow">{{ copy('NEW PASSWORD', 'NOUVEAU MOT DE PASSE') }}</p><h1>{{ copy('Choose a strong', 'Choisissez un mot de passe') }}<br><em>{{ copy('new beginning.', 'vraiment robuste.') }}</em></h1></div>
+        @if (authError) { <div class="form-notice error" role="alert">{{ authError }}</div> }
+        <label class="field"><span>{{ copy('New password', 'Nouveau mot de passe') }}</span><input name="resetPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="128" [(ngModel)]="resetForm.password"></label>
+        <label class="field"><span>{{ copy('Confirm password', 'Confirmez le mot de passe') }}</span><input name="resetConfirmPassword" type="password" autocomplete="new-password" required [(ngModel)]="resetForm.confirmPassword"></label>
+        <div class="password-meter" [attr.data-strength]="passwordStrength"><span></span><span></span><span></span><span></span><small>{{ copy('Use 12+ characters, uppercase, lowercase, a number and a symbol.', 'Utilisez 12+ caractères, majuscule, minuscule, chiffre et symbole.') }}</small></div>
+        <button class="button button-green submit-button" type="submit" [disabled]="authLoading">{{ authLoading ? copy('Saving…', 'Enregistrement…') : copy('Save new password', 'Enregistrer le mot de passe') }}</button>
+      </form>
+    } @else {
+      <form class="auth-form forgot-form" (ngSubmit)="submitVerifyEmail.emit()">
+        <div class="form-heading"><span class="round-icon">✦</span><p class="eyebrow">{{ copy('EMAIL VERIFICATION', 'VÉRIFICATION DE L’E-MAIL') }}</p><h1>{{ copy('Confirming your', 'Confirmation de votre') }}<br><em>{{ copy('botanical space.', 'espace botanique.') }}</em></h1></div>
+        @if (authError) { <div class="form-notice error" role="alert">{{ authError }}</div> }
+        @if (authSuccess) {
+          <div class="form-notice success" role="status">✓ {{ authSuccess }}</div><button class="button button-green submit-button" type="button" (click)="switchAuth.emit('login')">{{ copy('Continue to sign in', 'Continuer vers la connexion') }}</button>
+        } @else {
+          <p>{{ copy('For your protection, enter the same password used when creating the account.', 'Pour votre sécurité, saisissez le mot de passe utilisé lors de la création du compte.') }}</p>
+          <label class="field"><span>{{ copy('Registration password', 'Mot de passe d’inscription') }}</span><input name="verificationPassword" type="password" autocomplete="current-password" required maxlength="128" [ngModel]="verificationPassword" (ngModelChange)="verificationPasswordChange.emit($event)"></label>
+          <button class="button button-green submit-button" type="submit" [disabled]="authLoading">{{ authLoading ? copy('Confirming…', 'Confirmation…') : copy('Confirm my email', 'Confirmer mon e-mail') }}</button>
+        }
+      </form>
+    }
+  </div>
+</div>

@@ -1,0 +1,37 @@
+<section class="notification-queue" aria-labelledby="admin-payment-notifications-heading">
+  <div class="queue-heading">
+    <div>
+      <p>{{ copy('POST-PAYMENT OPERATIONS', 'OPÉRATIONS APRÈS PAIEMENT') }}</p>
+      <h2 id="admin-payment-notifications-heading">{{ copy('Email delivery issues', 'Problèmes d’envoi des e-mails') }}</h2>
+    </div>
+    <span [attr.aria-label]="copy(total + ' notifications need attention', total + ' notifications nécessitent une action')">{{ total }}</span>
+  </div>
+  @if (!notifications.length) {
+    <p class="empty">{{ copy('No payment emails need attention.', 'Aucun e-mail de paiement ne nécessite d’action.') }}</p>
+  }
+  @for (notification of notifications; track notification.id) {
+    <article class="notification-row">
+      <div class="notification-order">
+        <strong>{{ notification.orderNumber }}</strong>
+        <small>{{ notification.customerName }} · <a [href]="'mailto:' + notification.email">{{ notification.email }}</a></small>
+        <small>{{ typeLabel(notification.notificationType) }}@if (notification.referenceId) { · {{ notification.referenceId }} }</small>
+      </div>
+      <div class="notification-state">
+        <span class="state-pill" [class.failed]="notification.status === 'failed'">{{ statusLabel(notification.status) }}</span>
+        <small>{{ notification.attempts }} {{ copy('total attempts', 'tentatives au total') }} · {{ notification.consecutiveFailures }} {{ copy('consecutive failures', 'échecs consécutifs') }}</small>
+        @if (notification.lastError) { <small class="delivery-error">{{ notification.lastError }}</small> }
+      </div>
+      @if (notification.retryAvailable) {
+        <button type="button" [disabled]="loading" (click)="retry.emit(notification)">{{ loading ? copy('Working…', 'Traitement…') : copy('Retry email', 'Réessayer l’e-mail') }}</button>
+      } @else {
+        <span class="locked-note">{{ copy('Worker is processing this message.', 'Le worker traite ce message.') }}</span>
+      }
+    </article>
+  }
+  @if (hasMore) {
+    <button class="load-more" type="button" [disabled]="loading" (click)="loadMore.emit()">{{ loading ? copy('Loading…', 'Chargement…') : copy('Load older issues', 'Charger les anciens incidents') }}</button>
+  }
+  @if (notifications.length) {
+    <p class="notice">{{ copy('Fix the underlying address or mail-provider issue before retrying. If the server delivered a message but its acknowledgment was lost, a manual retry can send a duplicate; every retry is recorded in the audit log.', 'Corrigez d’abord l’adresse ou le problème du fournisseur de messagerie. Si le serveur a livré un message mais que son accusé de réception a été perdu, un nouvel essai manuel peut créer un doublon ; chaque nouvel essai est enregistré dans le journal d’audit.') }}</p>
+  }
+</section>

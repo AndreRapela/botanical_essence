@@ -1,0 +1,22 @@
+:host { display: block; margin-top: 34px; }
+.contact-inbox { background: rgba(255,255,255,.82); border: 1px solid rgba(38,54,31,.12); border-radius: 24px; box-shadow: 0 18px 55px rgba(35,48,28,.07); overflow: hidden; padding: clamp(22px, 3vw, 40px); }
+.inbox-heading { align-items: center; display: flex; justify-content: space-between; }
+.inbox-heading p { color: #536d46; font-size: 10px; letter-spacing: .2em; margin: 0; }
+.inbox-heading h2 { color: #18321e; font-family: Georgia, serif; font-size: clamp(29px, 2.8vw, 42px); font-weight: 400; margin: 8px 0 26px; }
+.inbox-heading > span { align-items: center; background: #31482a; border-radius: 50%; color: #fff; display: flex; font-size: 13px; height: 44px; justify-content: center; min-width: 44px; padding: 0 6px; }
+.contact-row { align-items: start; border-top: 1px solid rgba(38,54,31,.12); display: grid; gap: 14px; grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.5fr) minmax(90px, auto); padding: 18px 0; }
+.sender { display: grid; gap: 6px; min-width: 0; }
+.sender a, .sender small { color: #687163; font-size: 11px; overflow-wrap: anywhere; }
+.message { background: #f7f4eb; border: 1px solid rgba(38,54,31,.12); border-radius: 10px; color: #26361f; line-height: 1.55; max-height: 12rem; overflow: auto; overflow-wrap: anywhere; padding: 12px 14px; white-space: pre-wrap; }
+.status { color: #536d46; font-size: 11px; text-transform: uppercase; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
+.actions button, .load-more { background: transparent; border: 1px solid rgba(38,54,31,.25); border-radius: 999px; color: #31482a; cursor: pointer; font: inherit; font-size: 12px; min-height: 44px; padding: 10px 16px; }
+.actions button:disabled, .load-more:disabled { cursor: wait; opacity: .6; }
+.load-more { margin-top: 12px; }
+.notice { background: #f6f1e4; border: 1px solid #e5d8b7; color: #675d45; font-size: 11px; line-height: 1.65; margin: 18px 0 0; padding: 14px 16px; }
+.empty { color: #687163; padding: 12px 0; }
+@media (max-width: 600px) {
+  .contact-row { gap: 10px; grid-template-columns: 1fr; }
+  .status, .actions { grid-column: 1; }
+  .inbox-heading h2 { font-size: 30px; }
+}

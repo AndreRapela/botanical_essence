@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" role="img" aria-labelledby="title desc">
+  <title id="title">Botanical Essence</title>
+  <desc id="desc">Selo circular com folhas tropicais e sol.</desc>
+  <defs>
+    <path id="top" d="M49,148 A101,101 0 0,1 251,148"/>
+    <path id="bottom" d="M58,174 A96,96 0 0,0 242,174"/>
+  </defs>
+  <circle cx="150" cy="150" r="146" fill="#cfad7a"/>
+  <circle cx="150" cy="150" r="132" fill="none" stroke="#26361f" stroke-width="3"/>
+  <circle cx="150" cy="150" r="123" fill="none" stroke="#26361f" stroke-width="1.5" opacity=".8"/>
+  <g fill="none" stroke="#26361f" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="200" cy="103" r="37" fill="#465836" stroke-width="3"/>
+    <g stroke-width="2.5">
+      <path d="M200 55v-13M217 59l7-12M232 72l11-7M240 90l13-2M239 108l13 4M230 125l10 8"/>
+      <path d="M86 206c-3-64 13-107 45-132M89 164l-30-23M96 137l-23-29M106 112L96 78M92 166l31-16M98 137l31-17M109 109l24-17" stroke-width="4"/>
+      <path d="M59 141c-1-19 5-32 19-41 5 18-1 31-19 41zM73 108c3-20 13-31 29-36 0 19-9 31-29 36zM96 82c7-16 18-24 34-25-4 16-15 24-34 25z"/>
+      <path d="M92 164c18-10 34-9 48 3-16 12-32 11-48-3zM98 137c17-11 33-11 48-1-15 13-31 14-48 1z"/>
+    </g>
+    <path d="M146 101c39 10 60 39 53 77-8 41-36 66-71 52-35-14-48-53-28-87 12-21 26-35 46-42z" fill="#caa26d" stroke-width="4"/>
+    <path d="M145 105c9 36 4 77-16 121M145 106c-13 17-25 29-44 36M153 120c14 5 26 14 40 27M140 137c-12 12-23 20-38 25M148 148c15 8 27 18 43 31M137 171c-10 10-17 17-27 23M143 186c12 10 21 19 34 26" stroke-width="2.5"/>
+    <path d="M183 229c12-31 29-53 53-66M202 206l-4-29M213 190l15-26M193 208l31 1M207 189l30-7" stroke-width="4"/>
+  </g>
+  <g fill="#26361f" font-family="Georgia,serif" font-weight="700" text-anchor="middle">
+    <text font-size="19" letter-spacing="4"><textPath href="#top" startOffset="50%">BOTANICAL ESSENCE</textPath></text>
+    <text font-size="14" letter-spacing="5"><textPath href="#bottom" startOffset="50%">EST. 2026</textPath></text>
+  </g>
+</svg>

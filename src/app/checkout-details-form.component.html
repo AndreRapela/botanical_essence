@@ -1,0 +1,53 @@
+<form class="checkout-form" novalidate>
+  <fieldset class="contact-fieldset">
+    <legend><span>1</span>{{ copy('Contact', 'Contact') }}</legend>
+    <div class="field-grid">
+      <label class="field">
+        <span>{{ copy('Full name', 'Nom complet') }}</span>
+        <input name="checkoutName" autocomplete="name" required minlength="2" maxlength="120"
+          [value]="fullName" (input)="updateContact('name', $any($event.target).value)"
+          [placeholder]="copy('Your full name', 'Votre nom complet')">
+      </label>
+      <label class="field">
+        <span>{{ authenticated ? copy('Account email', 'E-mail du compte') : copy('Email address', 'Adresse e-mail') }}</span>
+        <input name="checkoutEmail" type="email" autocomplete="email" required maxlength="180"
+          [readOnly]="authenticated" [value]="email" (input)="updateContact('email', $any($event.target).value)"
+          placeholder="you@email.com">
+      </label>
+    </div>
+  </fieldset>
+
+  <ng-content></ng-content>
+
+  <fieldset class="payment-fieldset">
+    <legend><span>4</span>{{ copy('Payment method', 'Mode de paiement') }}</legend>
+    <p class="payment-local-note">
+      {{ copy('Stripe charges this order in', 'Stripe débite cette commande en') }} <strong>{{ currency }}</strong>.
+      @if (rateMetadata; as fx) {
+        @if (fx.currencyRateStatus === 'unavailable') {
+          {{ copy('The ECB reference is unavailable, so checkout is paused until a recent rate can be verified.', 'La référence BCE est indisponible ; le paiement est suspendu jusqu’à la vérification d’un taux récent.') }}
+        } @else if (fx.currencyRateDate) {
+          {{ copy('Displayed USD/EUR conversions use the ECB daily reference dated', 'Les conversions USD/EUR affichées utilisent le taux journalier de référence BCE du') }}
+          <strong>{{ fx.currencyRateDate }}</strong>
+          @if (euroPerDollar !== null) { · <strong>1 USD = {{ euroPerDollar | number:'1.4-4' }} EUR</strong> }
+          @if (fx.currencyRateStatus === 'recent_cache_provider_unavailable') {
+            {{ copy('(recent cached rate; provider refresh is temporarily unavailable)', '(taux récent en cache ; actualisation du fournisseur temporairement indisponible)') }}
+          } @else if (fx.currencyRateStatus === 'refresh_in_progress') {
+            {{ copy('(using the recent cached reference while its refresh completes)', '(référence récente en cache pendant la mise à jour)') }}
+          }
+        }
+      }
+      {{ copy('This is an informational reference, not a live FX quote or the merchant’s Stripe settlement rate. Settlement conversion, Stripe fees and your bank’s FX fees may differ.', 'Il s’agit d’une référence indicative, pas d’un cours en temps réel ni du taux de règlement Stripe du commerçant. La conversion au règlement, les frais Stripe et ceux de votre banque peuvent différer.') }}
+    </p>
+  </fieldset>
+
+  <app-checkout-payment-methods [currency]="currency" [language]="language" [selectedMethod]="selectedMethod"
+    (selectedMethodChange)="selectedMethodChange.emit($event)" />
+  <div class="payment-safety">
+    <span aria-hidden="true">♢</span>
+    <p>
+      <strong>{{ copy('European payment security, without storing raw card data.', 'Sécurité de paiement européenne, sans stockage des données brutes de carte.') }}</strong>
+      <small>{{ copy('Stripe Checkout handles card details and authentication on its hosted page. Strong Customer Authentication is completed when required by the bank.', 'Stripe Checkout traite les données de carte et l’authentification sur sa page sécurisée. L’authentification forte est effectuée si la banque la demande.') }}</small>
+    </p>
+  </div>
+</form>

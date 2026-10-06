@@ -1,0 +1,39 @@
+<aside class="order-summary" aria-labelledby="checkout-order-summary-title">
+  <div class="order-summary-head">
+    <div>
+      <p class="eyebrow">{{ copy('YOUR SELECTION', 'VOTRE SÉLECTION') }}</p>
+      <h2 id="checkout-order-summary-title">{{ copy('Order summary', 'Récapitulatif') }}</h2>
+    </div>
+    <button type="button" (click)="editCart.emit()">{{ copy('Edit', 'Modifier') }}</button>
+  </div>
+
+  @for (item of items; track item.id) {
+    <article>
+      <span class="cart-thumb sprite-{{ item.sprite }}" aria-hidden="true"></span>
+      <div><small>{{ item.quantity }} × {{ item.seller }}</small><h3>{{ item.name }}</h3><strong>{{ item.lineTotal }}</strong></div>
+    </article>
+  }
+
+  <div class="summary-totals">
+    <p><span>{{ subtotalLabel }}</span><strong>{{ subtotalAmount }}</strong></p>
+    <p>
+      <span>{{ copy('Estimated shipping', 'Livraison estimée') }}</span>
+      @if (shippingLoading) {
+        <strong class="summary-pending">{{ copy('Calculating…', 'Calcul…') }}</strong>
+      } @else if (hasShippingQuote) {
+        <strong>{{ shippingAmount }}</strong>
+      } @else {
+        <strong class="summary-pending">{{ copy('Enter address', 'Saisir l’adresse') }}</strong>
+      }
+    </p>
+    <p class="total"><span>{{ copy('Total', 'Total') }}</span><strong>{{ totalAmount }}</strong></p>
+    @if (!hasShippingQuote) {
+      <small class="summary-total-note">{{ copy('Delivery will be added after the address is validated.', 'La livraison sera ajoutée après validation de l’adresse.') }}</small>
+    }
+  </div>
+
+  <div class="summary-assurance">
+    <span aria-hidden="true">♧</span>
+    <p><strong>{{ copy('Thoughtfully packed', 'Emballé avec soin') }}</strong><small>{{ copy('Plants are protected by hand before every journey.', 'Les plantes sont protégées à la main avant chaque voyage.') }}</small></p>
+  </div>
+</aside>

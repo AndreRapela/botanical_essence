@@ -1,0 +1,140 @@
+name: botanicalessence
+
+x-app-environment: &app-environment
+  APP_ENV: ${APP_ENV:-development}
+  APP_URL: ${APP_URL:-http://localhost:4300}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+  ENABLE_DEMO_ACCOUNTS: ${ENABLE_DEMO_ACCOUNTS:-false}
+  ALLOW_DISPOSABLE_DB_TESTS: ${ALLOW_DISPOSABLE_DB_TESTS:-false}
+  TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
+  TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+  TRUSTED_PROXY_HOSTS: ${TRUSTED_PROXY_HOSTS:-frontend}
+  DB_HOST: mysql
+  DB_PORT: "3306"
+  DB_DATABASE: ${DB_DATABASE:-botanical_essence}
+  DB_USERNAME: ${DB_USERNAME:-botanical}
+  DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+  MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
+  MAIL_FROM: ${MAIL_FROM:-no-reply@botanicalessence.be}
+  MAIL_HOST: ${MAIL_HOST:-}
+  MAIL_PORT: ${MAIL_PORT:-587}
+  MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
+  MAIL_USERNAME: ${MAIL_USERNAME:-}
+  MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+  PAYMENT_INSTRUCTIONS: ${PAYMENT_INSTRUCTIONS:-}
+  PAYMENT_EXECUTION_MODE: ${PAYMENT_EXECUTION_MODE:-local_simulation}
+  PAYMENT_TEST_MODE: ${PAYMENT_TEST_MODE:-true}
+  PAYMENT_TEST_PRODUCT_SLUG: ${PAYMENT_TEST_PRODUCT_SLUG:-monstera-essencial}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  STRIPE_ACCOUNT_ID: ${STRIPE_ACCOUNT_ID:-}
+  STRIPE_SETTLEMENT_CURRENCY: ${STRIPE_SETTLEMENT_CURRENCY:-}
+  STRIPE_PAYMENT_LIMITS_JSON: ${STRIPE_PAYMENT_LIMITS_JSON:-}
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-4300}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      <<: *app-environment
+      ALLOW_TEST_ORDER_CREATION: ${ALLOW_TEST_ORDER_CREATION:-false}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8180}:80"
+    volumes:
+      - type: bind
+        source: ${BACKEND_STORAGE_PATH:-./backend/storage}
+        target: /var/www/html/storage
+        bind:
+          create_host_path: false
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://localhost/api/health') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  payment-operations:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    entrypoint: ["php"]
+    command: ["/var/www/html/bin/payment-operations-worker.php"]
+    environment:
+      <<: *app-environment
+    volumes:
+      - type: bind
+        source: ${BACKEND_STORAGE_PATH:-./backend/storage}
+        target: /var/www/html/storage
+        bind:
+          create_host_path: false
+    depends_on:
+      backend:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "$$path='/var/www/html/storage/payment-worker-heartbeat'; exit(is_file($$path) && time() - filemtime($$path) < 900 ? 0 : 1);"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  mysql:
+    image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      MYSQL_DATABASE: ${DB_DATABASE:-botanical_essence}
+      MYSQL_USER: ${DB_USERNAME:-botanical}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3317}:3306"
+    volumes:
+      - botanical_mysql:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          root_pw="$${MYSQL_ROOT_PASSWORD}"; app_pw="$${MYSQL_PASSWORD}";
+          [ "$$root_pw" != "$$app_pw" ] || exit 1;
+          case "$$root_pw" in *replace-with*|*change-me*|*changeme*|*password*|*placeholder*|*example*|*not-a-secret*) exit 1;; esac;
+          case "$$app_pw" in *replace-with*|*change-me*|*changeme*|*password*|*placeholder*|*example*|*not-a-secret*) exit 1;; esac;
+          if [ "$$APP_ENV" = staging ] || [ "$$APP_ENV" = production ]; then
+            [ "$${#root_pw}" -ge 32 ] && [ "$${#app_pw}" -ge 32 ] || exit 1;
+          fi;
+          MYSQL_PWD="$$root_pw" mysql -h localhost -uroot --connect-timeout=3 --silent --skip-column-names -e 'SELECT 1' | grep -qx 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 1m
+
+volumes:
+  botanical_mysql:

@@ -1,0 +1,144 @@
+<section class="managed-list admin-list" aria-labelledby="admin-withdrawals-heading">
+  <div class="managed-list-heading">
+    <div>
+      <p class="eyebrow">{{ copy('CONSUMER RIGHTS', 'DROITS DES CONSOMMATEURS') }}</p>
+      <h2 id="admin-withdrawals-heading">{{ copy('Withdrawals & returns', 'Rétractations et retours') }}</h2>
+    </div>
+    <span>{{ withdrawals.length }} / {{ withdrawalsTotal }}</span>
+  </div>
+
+  @if (!withdrawals.length) {
+    <p class="catalog-status">{{ copy('No customer withdrawal or return requests yet.', 'Aucune demande de rétractation ou de retour pour le moment.') }}</p>
+  }
+
+  @for (request of withdrawals; track request.id) {
+    <article class="managed-row admin-withdrawal-row">
+      <div>
+        <strong>{{ request.requestNumber }} · {{ request.orderNumber }}</strong>
+        <small>{{ request.customerName }} · {{ request.email }}</small>
+        <small>{{ request.requestType === 'withdrawal' ? copy('Withdrawal notice', 'Demande de rétractation') : copy('Customer issue report', 'Signalement du client') }} · {{ request.createdAt | date:'medium' }}</small>
+        @if (request.deliveryReceivedDate) {
+          <small>{{ copy('Customer-declared goods receipt date:', 'Date de réception déclarée par le client :') }} {{ request.deliveryReceivedDate | date:'mediumDate':'+0000' }}</small>
+        }
+        @if (request.orderItems) {
+          <small>{{ copy('Items in order:', 'Articles de la commande :') }} {{ request.orderItems }}</small>
+        }
+      </div>
+      <div>
+        <strong>{{ priceFormatter(request.total, request.currency) }}</strong>
+        <small>{{ request.orderStatus }} · {{ request.paymentStatus }}</small>
+        @if (request.deliveryReceivedDate) {
+          <small>{{ copy('Customer-stated receipt date', 'Date de réception déclarée') }}: {{ request.deliveryReceivedDate }}</small>
+        }
+      </div>
+      <div class="admin-withdrawal-notes">
+        @if (request.customerMessage) {
+          <small>{{ request.customerMessage }}</small>
+        } @else {
+          <small>{{ copy('No explanation is required for a statutory withdrawal notice.', 'Aucune justification n’est requise pour une demande légale de rétractation.') }}</small>
+        }
+        @if (request.adminNote) { <small class="admin-warning">{{ request.adminNote }}</small> }
+        @if (request.refundErrorCode) { <small class="admin-warning">{{ request.refundErrorCode }} · {{ request.refundErrorMessage }}</small> }
+      </div>
+      <span>{{ withdrawalStatusLabel(request.status) }}</span>
+      <div class="row-actions">
+        @if (request.status === 'submitted') {
+          <button type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'review' })">{{ copy('Start review', 'Commencer l’examen') }}</button>
+        }
+        @if (['submitted','reviewing'].includes(request.status)) {
+          <button type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'send_instructions' })">{{ copy('Send return instructions', 'Envoyer les instructions') }}</button>
+          <button class="danger-link" type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'not_eligible' })">{{ copy('Record legal exception', 'Enregistrer une exception légale') }}</button>
+        }
+        @if (request.status === 'instructions_sent') {
+          <button type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'mark_received' })">{{ copy('Record return/proof received', 'Enregistrer retour/preuve reçu') }}</button>
+          <button class="danger-link" type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'not_eligible' })">{{ copy('Record legal exception', 'Enregistrer une exception légale') }}</button>
+        }
+        @if (request.status === 'return_received') {
+          <button class="danger-link" type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'refund' })">{{ copy('Refund remaining balance', 'Rembourser le solde restant') }}</button>
+        }
+        @if (request.status === 'refund_pending') {
+          <button type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'check_refund' })">{{ copy('Check Stripe refund', 'Vérifier le remboursement Stripe') }}</button>
+        }
+        @if (request.status === 'refund_failed') {
+          <button class="danger-link" type="button" [disabled]="loading" (click)="withdrawalAction.emit({ request, action: 'retry_refund' })">{{ copy('Retry full refund', 'Réessayer le remboursement intégral') }}</button>
+        }
+      </div>
+    </article>
+  }
+
+  @if (withdrawalsHasMore) {
+    <button class="button button-outline" type="button" [disabled]="loading" (click)="loadMoreWithdrawals.emit()">
+      {{ loading ? copy('Loading…', 'Chargement…') : copy('Load older consumer requests', 'Charger les anciennes demandes') }}
+    </button>
+  }
+  @if (withdrawals.length) {
+    <p class="returns-admin-note">{{ copy('A withdrawal refund sends only the still-unrefunded balance to the original Stripe payment method and records the provider attempt. Confirm receipt or proof, review any legal exception individually, and inspect returned goods before changing inventory. This portal does not automatically decide that plants are perishable.', 'Le remboursement de rétractation ne verse que le solde non encore remboursé sur le moyen Stripe initial et enregistre chaque tentative. Vérifiez le retour/la preuve, examinez chaque exception juridique individuellement et contrôlez les biens avant de modifier le stock. Ce portail ne considère pas automatiquement les plantes comme périssables.') }}</p>
+  }
+</section>
+
+<section class="managed-list admin-list" aria-labelledby="admin-orders-heading">
+  <div class="managed-list-heading">
+    <div>
+      <p class="eyebrow">{{ copy('ORDERS & PAYMENTS', 'COMMANDES ET PAIEMENTS') }}</p>
+      <h2 id="admin-orders-heading">{{ copy('Purchases', 'Achats') }}</h2>
+    </div>
+    <span>{{ orders.length }} / {{ ordersTotal }}</span>
+  </div>
+
+  @if (!orders.length) {
+    <p class="catalog-status">{{ copy('No purchases have been placed yet.', 'Aucun achat pour le moment.') }}</p>
+  }
+  @for (order of orders; track order.id) {
+    <article class="managed-row admin-order-row">
+      <div>
+        <strong>{{ order.number }}</strong>
+        <small>{{ order.customerName }} · {{ order.email }}</small>
+        @if (order.refundErrorCode) {
+          <small class="admin-warning" role="note"><b>{{ copy('Refund issue', 'Problème de remboursement') }}: {{ order.refundErrorCode }}@if (order.refundErrorHttpStatus) { · HTTP {{ order.refundErrorHttpStatus }} }</b> {{ order.refundErrorMessage }}</small>
+        }
+        @if (order.paymentSessionUnconfirmed || order.paymentReconciliationRequired) {
+          <small class="admin-warning" role="alert">{{ order.status === 'cancelled' ? copy('This order was cancelled without confirming whether Stripe created a session. Check Stripe for a late payment and refund it if necessary.', 'Cette commande a été annulée sans confirmer si Stripe avait créé une session. Vérifiez les paiements tardifs dans Stripe et remboursez-les si nécessaire.') : order.paymentReconciliationRequired ? copy('Stripe checkout session is unresolved. Verify the order reference in Stripe before cancelling; inventory remains reserved.', 'La session Stripe reste introuvable. Vérifiez la référence de commande dans Stripe avant toute annulation ; le stock reste réservé.') : copy('Stripe has not confirmed whether checkout was created. Only retry this same order; do not start a second purchase.', 'Stripe n’a pas confirmé si la session a été créée. Reprenez uniquement cette commande ; n’en créez pas une seconde.') }}</small>
+        }
+      </div>
+      <div>
+        <strong>{{ order.items.length }} {{ copy('item(s)', 'article(s)') }}@if (order.testPayment) { · {{ copy('TEST', 'TEST') }} }</strong>
+        <small>{{ adminOrderItems(order) }}</small>
+        <small class="admin-warning" role="note">{{ copy('Shipping is an estimate. Create and track the bpost shipment outside this site; no label or tracking is generated here.', 'La livraison est estimative. Créez et suivez l’envoi bpost en dehors de ce site ; aucune étiquette ni aucun suivi n’y est généré.') }}</small>
+      </div>
+      <span>{{ order.status }} · {{ order.paymentStatus }}@if (order.paymentProvider === 'stripe' && order.refundAttempt > 0) { · {{ order.refundOutcome }} #{{ order.refundAttempt }} }</span>
+      <div>
+        <b>{{ priceFormatter(order.total, order.currency) }}</b>
+        @if (order.refundedTotalCents > 0) {
+          <small>{{ copy('Refunded:', 'Remboursé :') }} {{ priceFormatter(order.refundedTotalCents / 100, order.currency) }} · {{ copy('remaining:', 'restant :') }} {{ priceFormatter(adminOrderRefundRemaining(order), order.currency) }}</small>
+        }
+      </div>
+      <div class="row-actions">
+        @if (order.paymentReconciliationRequired && order.paymentStatus === 'pending') {
+          <button class="danger-link" type="button" [disabled]="loading" (click)="resolveCheckoutAttempt.emit(order)">{{ copy('Resolve verified unpaid attempt', 'Clôturer la tentative vérifiée non payée') }}</button>
+        }
+        @if (order.paymentProvider === 'stripe' && order.refundAttempt > 0 && ['refund_pending', 'paid', 'partially_refunded'].includes(order.paymentStatus) && (!['shipped', 'delivered'].includes(order.status) || order.refundAttemptIsPartial)) {
+          <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'check_refund' })">{{ copy('Check refund', 'Consulter le remboursement') }}</button>
+          @if (!order.refundAttemptIsPartial && order.paymentStatus === 'paid' && ['definitive_failure', 'manual_not_refunded'].includes(order.refundOutcome)) {
+            <button class="danger-link" type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'retry_refund' })">{{ copy('Retry refund', 'Réessayer le remboursement') }}</button>
+          }
+          <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'refunded' })">{{ copy('Resolve as refunded', 'Marquer comme remboursé') }}</button>
+          <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'not_refunded' })">{{ copy('Resolve as not refunded', 'Marquer comme non remboursé') }}</button>
+        }
+        @if (order.paymentProvider === 'stripe' && ['paid', 'partially_refunded'].includes(order.paymentStatus)) {
+          <button type="button" [disabled]="loading" (click)="partialRefund.emit(order)">{{ copy('Partial refund', 'Remboursement partiel') }}</button>
+        }
+        @if (!order.paymentSessionUnconfirmed && !order.paymentReconciliationRequired && !['shipped', 'delivered', 'cancelled'].includes(order.status) && !['refund_pending', 'partially_refunded'].includes(order.paymentStatus)) {
+          <button class="danger-link" type="button" [disabled]="loading" (click)="cancelOrder.emit(order)">{{ order.paymentProvider === 'local_test' && order.testPayment ? copy('Cancel test order', 'Annuler la commande de test') : order.paymentStatus === 'paid' ? copy('Cancel & refund', 'Annuler et rembourser') : copy('Cancel order', 'Annuler') }}</button>
+        }
+        @if (order.status === 'cancelled' && order.paymentProvider === 'stripe' && order.paymentStatus === 'paid' && order.refundAttempt === 0) {
+          <button class="danger-link" type="button" [disabled]="loading" (click)="cancelOrder.emit(order)">{{ copy('Start refund', 'Démarrer le remboursement') }}</button>
+        }
+      </div>
+    </article>
+  }
+  @if (ordersHasMore) {
+    <button class="button button-outline" type="button" [disabled]="loading" (click)="loadMoreOrders.emit()">
+      {{ loading ? copy('Loading…', 'Chargement…') : copy('Load older orders', 'Charger les anciennes commandes') }}
+    </button>
+  }
+</section>

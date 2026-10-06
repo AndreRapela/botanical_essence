@@ -1,0 +1,20 @@
+<div class="payment-provider-choice" role="radiogroup" [attr.aria-label]="copy('Confirm your payment method', 'Confirmer le mode de paiement')">
+  <label [class.active]="selectedMethod === 'bancontact'" [class.disabled]="isDisabled('bancontact')">
+    <input type="radio" name="securePayment" value="bancontact" [checked]="selectedMethod === 'bancontact'" [disabled]="isDisabled('bancontact')" (change)="selectPaymentMethod('bancontact')">
+    <span class="payment-method-icon payment-method-icon-bancontact">BC</span>
+    <span><strong>Bancontact</strong><small>{{ copy('Belgian bank app · EUR only', 'Application bancaire belge · EUR uniquement') }}</small></span>
+    <b>{{ selectedMethod === 'bancontact' ? '✓' : '○' }}</b>
+  </label>
+  <label [class.active]="selectedMethod === 'card'">
+    <input type="radio" name="securePayment" value="card" [checked]="selectedMethod === 'card'" (change)="selectPaymentMethod('card')">
+    <span class="payment-method-icon">▭</span>
+    <span><strong>{{ copy('Debit or credit card', 'Carte de débit ou crédit') }}</strong><small>{{ copy('Card brands shown in Stripe Checkout; Apple Pay or Google Pay only if eligible and enabled there.', 'Cartes affichées dans Stripe Checkout ; Apple Pay ou Google Pay uniquement s’ils sont compatibles et activés.') }}</small></span>
+    <b>{{ selectedMethod === 'card' ? '✓' : '○' }}</b>
+  </label>
+  <label [class.active]="selectedMethod === 'sepa_debit'" [class.disabled]="isDisabled('sepa_debit')">
+    <input type="radio" name="securePayment" value="sepa_debit" [checked]="selectedMethod === 'sepa_debit'" [disabled]="isDisabled('sepa_debit')" (change)="selectPaymentMethod('sepa_debit')">
+    <span class="payment-method-icon">€</span>
+    <span><strong>{{ copy('SEPA Direct Debit', 'Prélèvement SEPA') }}</strong><small>{{ copy('EUR only · confirmation may be delayed', 'EUR uniquement · confirmation parfois différée') }}</small></span>
+    <b>{{ selectedMethod === 'sepa_debit' ? '✓' : '○' }}</b>
+  </label>
+</div>

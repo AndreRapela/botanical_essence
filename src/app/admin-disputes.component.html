@@ -1,0 +1,43 @@
+<section class="disputes-queue" aria-labelledby="admin-disputes-heading">
+  <div class="queue-heading">
+    <div>
+      <p>{{ copy('PAYMENT RISK', 'RISQUE DE PAIEMENT') }}</p>
+      <h2 id="admin-disputes-heading">{{ copy('Disputes & chargebacks', 'Litiges et contestations') }}</h2>
+    </div>
+    <span [attr.aria-label]="copy(disputes.length + ' of ' + total + ' disputes', disputes.length + ' sur ' + total + ' litiges')">{{ disputes.length }} / {{ total }}</span>
+  </div>
+  @if (!disputes.length) {
+    <p class="empty">{{ copy('No Stripe disputes have been synchronized.', 'Aucun litige Stripe synchronisé.') }}</p>
+  }
+  @for (dispute of disputes; track dispute.id) {
+    <article class="dispute-row">
+      <div class="case-details">
+        <strong>{{ dispute.orderNumber || copy('Unmatched Stripe dispute', 'Litige Stripe non rapproché') }}</strong>
+        <small>{{ dispute.id }} · {{ dispute.reason || copy('Reason not supplied', 'Motif non indiqué') }}</small>
+        @if (dispute.customerName || dispute.email) {
+          <small>@if (dispute.customerName) { {{ dispute.customerName }} }@if (dispute.customerName && dispute.email) { · }{{ dispute.email || '' }}</small>
+        }
+        @if (dispute.syncError) { <small class="warning" role="alert">{{ dispute.syncError }}</small> }
+      </div>
+      <div class="case-value">
+        <strong>{{ formatAmount(dispute) }}</strong>
+        <small>{{ dispute.status }}</small>
+        @if (dispute.evidenceDueAt) {
+          <small class="deadline">{{ copy('Evidence deadline:', 'Échéance des preuves :') }} {{ dispute.evidenceDueAt | date:'medium' }}</small>
+        }
+      </div>
+      <span class="mode-badge" [class.live]="dispute.livemode">{{ dispute.livemode ? copy('LIVE', 'LIVE') : copy('TEST', 'TEST') }}</span>
+      <a class="review-link" [href]="disputeUrl(dispute)" target="_blank" rel="noopener noreferrer">
+        {{ copy('Review in Stripe', 'Examiner dans Stripe') }} <span aria-hidden="true">↗</span>
+      </a>
+    </article>
+  }
+  @if (hasMore) {
+    <button class="load-more" type="button" [disabled]="loading" (click)="loadMore.emit()">
+      {{ loading ? copy('Loading…', 'Chargement…') : copy('Load more Stripe disputes', 'Charger plus de litiges Stripe') }}
+    </button>
+  }
+  @if (disputes.length) {
+    <p class="notice">{{ copy('This queue is synchronized from Stripe webhooks and periodic recovery. Submit evidence or accept a dispute only in Stripe after reviewing the case; this site does not fabricate evidence or decide the outcome.', 'Cette file est synchronisée par les webhooks Stripe et la récupération périodique. Soumettez les preuves ou acceptez un litige uniquement dans Stripe après examen ; le site ne fabrique pas de preuves et ne décide pas du résultat.') }}</p>
+  }
+</section>

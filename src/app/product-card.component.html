@@ -1,0 +1,24 @@
+<article class="product-card">
+  <div class="product-image sprite-{{ product.sprite }}">
+    <button class="product-image-link" type="button" (click)="openProduct()" [attr.aria-label]="openLabel()"></button>
+    @if (showBadges && product.badge) { <span class="product-badge">{{ badgeLabel() }}</span> }
+    @if (showBadges && product.marketplace) { <span class="seller-badge">{{ translate('product.marketplace') }}</span> }
+    <button class="favorite-button" type="button" [class.active]="favorite" [attr.aria-label]="translate(favorite ? 'product.favoriteRemove' : 'product.favoriteAdd')" (click)="toggleFavorite()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21S3 16 3 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 9 2.5C21 16 12 21 12 21Z"></path></svg>
+    </button>
+  </div>
+  <div class="product-info">
+    <p class="product-seller">{{ product.seller }}</p>
+    <h3><button class="product-title-button" type="button" (click)="openProduct()">{{ product.name }}</button></h3>
+    <p>{{ product.subtitle }}</p>
+    <button class="product-rating" type="button" (click)="openProduct()" [attr.aria-label]="ratingLabel()">
+      <span aria-hidden="true">{{ ratingStars() }}</span><small>{{ ratingSummary() }}</small>
+    </button>
+    <div class="product-bottom">
+      <strong>{{ displayPrice }}</strong>
+      <button type="button" [attr.aria-label]="addLabel()" (click)="addToCart()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </div>
+  </div>
+</article>

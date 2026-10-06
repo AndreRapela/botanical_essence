@@ -1,0 +1,116 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "projects",
+  "projects": {
+    "botanical-essence": {
+      "projectType": "application",
+      "schematics": {},
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist/botanical-essence",
+            "index": "src/index.html",
+            "browser": "src/main.ts",
+            "polyfills": ["zone.js"],
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              { "glob": "**/*", "input": "public" },
+              { "glob": "**/*", "input": "src/assets", "output": "assets", "ignore": ["**/*.png"] }
+            ],
+            "styles": ["src/styles.css"]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                { "type": "initial", "maximumWarning": "700kB", "maximumError": "1.5MB" },
+                { "type": "anyComponentStyle", "maximumWarning": "92kB", "maximumError": "105kB" }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": { "buildTarget": "botanical-essence:build:production" },
+            "development": { "buildTarget": "botanical-essence:build:development" }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "botanical-essence:build:development",
+            "tsConfig": "tsconfig.spec.json",
+            "runner": "vitest",
+            "runnerConfig": "vitest.config.mts",
+            "coverageExclude": [
+              "src/app/app.component.ts",
+              "src/app/app.component.html",
+              "src/app/**/*.component.html",
+              "src/app/storefront.models.ts"
+            ],
+            "coverageInclude": [
+              "src/app/core/**/*.ts",
+              "src/app/checkout/**/*.ts",
+              "src/app/i18n/**/*.ts",
+                "src/app/admin-contact-inbox.component.ts",
+                "src/app/admin-audit-log.component.ts",
+                "src/app/admin-disputes.component.ts",
+                "src/app/admin-financial-operations.component.ts",
+                "src/app/admin-catalog-management.component.ts",
+                "src/app/checkout-delivery.component.ts",
+                "src/app/checkout-final-review.component.ts",
+                "src/app/checkout-order-summary.component.ts",
+                "src/app/checkout-details-form.component.ts",
+                "src/app/checkout/shipping-display.ts",
+                "src/app/checkout-pending.component.ts",
+                "src/app/account-order-history.component.ts",
+                "src/app/seller-studio.component.ts",
+                "src/app/order.view.ts",
+                "src/app/admin-payment-notifications.component.ts",
+              "src/app/admin-refund-interaction.ts",
+              "src/app/checkout-payment-methods.component.ts",
+              "src/app/product-card.component.ts",
+              "src/app/information-pages.component.ts"
+            ],
+            "coverageReporters": ["text", "html", "lcov"],
+            "coverageThresholds": {
+              "statements": 75,
+              "branches": 65,
+              "functions": 75,
+              "lines": 75
+            }
+          },
+          "configurations": {
+            "shellCoverage": {
+              "coverageExclude": [
+                "src/app/app.component.html",
+                "src/app/**/*.component.html",
+                "src/app/storefront.models.ts"
+              ],
+                "coverageInclude": ["src/app/app.component.ts", "src/app/checkout.actions.ts", "src/app/checkout/shipping-display.ts", "src/app/product.actions.ts", "src/app/order.view.ts", "src/app/auth-form.component.ts", "src/app/admin-financial-operations.component.ts", "src/app/admin-catalog-management.component.ts", "src/app/checkout-delivery.component.ts", "src/app/checkout-final-review.component.ts", "src/app/checkout-order-summary.component.ts", "src/app/checkout-details-form.component.ts", "src/app/checkout-pending.component.ts", "src/app/account-order-history.component.ts", "src/app/seller-studio.component.ts"],
+                "coverageThresholds": {
+                  "statements": 60,
+                  "branches": 49,
+                  "functions": 46,
+                  "lines": 62
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

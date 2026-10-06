@@ -1,0 +1,665 @@
+<div class="site-shell">
+  <div class="announcement" aria-hidden="true"></div>
+  <header class="desktop-header" [attr.aria-label]="tr('aria.header')">
+    <button class="brand" type="button" [attr.aria-label]="tr('aria.home')" (click)="navigatePage('home')">
+      <span class="exact-logo" aria-hidden="true"></span>
+    </button>
+    <nav class="desktop-nav" [attr.aria-label]="tr('aria.navigation')">
+      <button class="nav-link" [class.active]="currentPage === 'home'" type="button" (click)="navigatePage('home')">{{ tr('nav.home') }}</button>
+      <button class="nav-link" [class.active]="currentPage === 'shop'" type="button" (click)="navigatePage('shop')">{{ tr('nav.shop') }}</button>
+      <button class="nav-link" [class.active]="currentPage === 'marketplace'" type="button" (click)="navigatePage('marketplace')">{{ tr('nav.marketplace') }}</button>
+      <button class="nav-link" [class.active]="currentPage === 'essence'" type="button" (click)="navigatePage('essence')">{{ tr('nav.essence') }}</button>
+    </nav>
+
+    <div class="header-actions">
+      <div class="header-preferences">
+        <div class="language-switch" role="group" [attr.aria-label]="tr('aria.language')">
+          @for (language of languages; track language) {
+            <button type="button" [class.active]="currentLanguage === language" [attr.aria-pressed]="currentLanguage === language" (click)="setLanguage(language)">{{ language.toUpperCase() }}</button>
+          }
+        </div>
+        <div class="currency-switch" role="group" [attr.aria-label]="tr('aria.currency')">
+          @for (currency of currencies; track currency) {
+            <button type="button" [class.active]="currentCurrency === currency" [attr.aria-pressed]="currentCurrency === currency" (click)="setCurrency(currency)">{{ currency }}</button>
+          }
+        </div>
+      </div>
+      <button class="icon-button" type="button" [attr.aria-label]="tr('aria.search')" (click)="openSearch()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+      </button>
+      <button class="icon-button" [class.active-account]="currentPage === 'account'" type="button" [attr.aria-label]="tr('aria.account')" (click)="navigatePage('account', 'login')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-5 4-7 8-7s7 2 8 7"></path></svg>
+      </button>
+      <button class="cart-button" type="button" [attr.aria-label]="tr('aria.openCart')" [attr.aria-expanded]="cartOpen" (click)="openCart()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1 13H6L5 8Z"></path><path d="M9 10V6a3 3 0 0 1 6 0v4"></path></svg>
+        <span>{{ tr('nav.cart') }}</span>
+        @if (cartCount) { <b>{{ cartCount }}</b> }
+      </button>
+    </div>
+  </header>
+
+  <header class="mobile-header" [class.inner-mobile-header]="currentPage !== 'home'" [attr.aria-label]="tr('aria.mobileHeader')">
+    <button class="mobile-header-button" type="button" [attr.aria-label]="tr('aria.openMenu')" [attr.aria-expanded]="menuOpen" (click)="toggleMenu()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h13"></path></svg>
+    </button>
+    <span class="mobile-wordmark">BOTANICAL ESSENCE</span>
+    <button class="mobile-header-button" type="button" [attr.aria-label]="tr('aria.openCart')" [attr.aria-expanded]="cartOpen" (click)="openCart()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1 13H6L5 8Z"></path><path d="M9 10V6a3 3 0 0 1 6 0v4"></path></svg>
+      @if (cartCount) { <b>{{ cartCount }}</b> }
+    </button>
+  </header>
+
+  <main [hidden]="currentPage !== 'home'">
+    <section id="inicio" class="hero" aria-labelledby="hero-title">
+      <div class="hero-shade"></div>
+      <div class="hero-content">
+        <p class="eyebrow light">{{ tr('hero.eyebrow') }}</p>
+        <h1 id="hero-title">{{ tr('hero.title1') }}<br>{{ tr('hero.title2') }}<br><em>{{ tr('hero.title3') }}</em></h1>
+        <p class="hero-description">{{ tr('hero.description') }}</p>
+        <div class="hero-actions">
+          <button class="button button-light" type="button" (click)="navigatePage('shop')">
+            {{ tr('hero.explore') }}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-5-5 5 5-5 5"></path></svg>
+          </button>
+          <button class="text-link light-link" type="button" (click)="navigatePage('marketplace')">{{ tr('hero.marketplace') }}</button>
+        </div>
+      </div>
+
+      <div class="hero-seal" aria-hidden="true">
+        <span class="exact-logo"></span>
+      </div>
+
+      <div class="mobile-welcome">
+        <span class="mobile-logo exact-logo" role="img" aria-label="Botanical Essence"></span>
+        <p class="eyebrow">{{ tr('hero.eyebrow') }}</p>
+        <h1>{{ tr('hero.title1') }}<br>{{ tr('hero.title2') }}<br>{{ tr('hero.title3') }}</h1>
+        <p>{{ tr('hero.description') }}</p>
+
+        <div class="quick-grid" [attr.aria-label]="tr('aria.shortcuts')">
+          <button type="button" (click)="scrollTo('loja')">
+            <span class="quick-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M27 5C15 6 8 12 8 23c9 0 16-7 19-18Z"></path><path d="M5 27C9 20 15 15 23 10M9 18c-3-1-5-3-6-6 5 0 8 2 10 5"></path></svg></span>
+            <strong>{{ tr('quick.shop') }}</strong>
+            <small>{{ tr('quick.shopSub') }}</small>
+          </button>
+          <button type="button" (click)="scrollTo('marketplace')">
+            <span class="quick-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 12h24l-2-7H6l-2 7Z"></path><path d="M6 12v15h20V12M12 27v-8h8v8M3 12c1 4 6 4 7 0 1 4 6 4 7 0 1 4 6 4 7 0 1 3 4 3 5 0"></path></svg></span>
+            <strong>{{ tr('nav.marketplace') }}</strong>
+            <small>{{ tr('quick.marketSub') }}</small>
+          </button>
+          <button type="button" (click)="navigatePage('favorites')">
+            <span class="quick-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27S4 20 4 11c0-4 3-7 7-7 3 0 5 2 5 4 1-2 3-4 6-4 4 0 7 3 7 7 0 9-13 16-13 16Z"></path></svg></span>
+            <strong>{{ tr('quick.favorites') }}</strong>
+            <small>{{ favorites.size }} {{ tr('quick.saved') }}</small>
+          </button>
+          <button type="button" (click)="navigatePage('account', 'login')">
+            <span class="quick-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="10" r="6"></circle><path d="M5 29c1-8 5-11 11-11s10 3 11 11"></path></svg></span>
+            <strong>{{ tr('quick.profile') }}</strong>
+            <small>{{ tr('quick.profileSub') }}</small>
+          </button>
+        </div>
+      </div>
+
+      <button class="hero-scroll" type="button" [attr.aria-label]="tr('aria.more')" (click)="scrollTo('loja')">
+        <span>{{ tr('hero.discover') }}</span><i></i>
+      </button>
+    </section>
+
+    <section class="benefits" [attr.aria-label]="tr('aria.benefits')">
+      <article>
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M27 5C15 6 8 12 8 23c9 0 16-7 19-18Z"></path><path d="M5 27C9 20 15 15 23 10"></path></svg>
+        <strong>{{ tr('benefit.curated') }}</strong>
+      </article>
+      <article>
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27V13"></path><path d="M16 17c-6 0-9-3-9-8 6 0 9 3 9 8Z"></path><path d="M16 13c0-5 3-8 9-8 0 5-3 8-9 8Z"></path><path d="M8 27h16"></path></svg>
+        <strong>{{ tr('benefit.delivery') }}</strong>
+      </article>
+      <article>
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 12h20l-3 9H9l-3-9Z"></path><path d="M10 12V8h12v4"></path><circle cx="11" cy="24" r="2"></circle><circle cx="22" cy="24" r="2"></circle></svg>
+        <strong>{{ tr('benefit.care') }}</strong>
+      </article>
+      <article>
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27V13"></path><path d="M16 19C9 19 5 14 5 7c7 0 11 5 11 12Z"></path><path d="M16 15c0-6 4-10 11-10 0 7-4 11-11 11Z"></path></svg>
+        <strong>{{ tr('benefit.conscious') }}</strong>
+      </article>
+      <p class="benefits-motto">{{ tr('benefit.motto') }}</p>
+    </section>
+
+    <section id="loja" class="shop-section section-pad">
+      <div class="section-heading split-heading">
+        <div>
+          <p class="eyebrow">{{ tr('shop.eyebrow') }}</p>
+          <h2>{{ tr('shop.title1') }}<br><em>{{ tr('shop.title2') }}</em></h2>
+        </div>
+        <p>{{ tr('shop.description') }}</p>
+      </div>
+
+      <div class="category-tabs" role="tablist" [attr.aria-label]="tr('aria.categories')">
+        @for (category of categoryIds; track category) {
+          <button type="button" role="tab" [class.active]="selectedCategory === category" [attr.aria-selected]="selectedCategory === category" (click)="filterBy(category)">{{ categoryLabel(category) }}</button>
+        }
+      </div>
+
+      @if (catalog.loading()) { <p class="catalog-status" role="status">{{ copy('Loading the collection…', 'Chargement de la collection…') }}</p> }
+      @if (catalog.error()) { <p class="catalog-status error" role="alert">{{ copy('The collection is temporarily unavailable.', 'La collection est temporairement indisponible.') }}</p> }
+      <div class="product-grid">
+        @for (product of visibleProducts; track product.id) {
+          <app-product-card
+            [product]="product"
+            [displayPrice]="formatPrice(productPrice(product))"
+            [language]="currentLanguage"
+            [favorite]="favorites.has(product.id)"
+            (open)="openProductDetails($event)"
+            (favoriteToggle)="toggleFavorite($event)"
+            (add)="addToCart($event)"
+          />
+        } @empty {
+          @if (catalog.loaded() && !catalog.loading() && !catalog.error()) { <p class="empty-state">{{ tr('shop.empty') }}</p> }
+        }
+      </div>
+
+      <button class="button button-outline centered-button" type="button" (click)="navigatePage('shop')">{{ tr('shop.viewAll') }}</button>
+    </section>
+
+    <section id="marketplace" class="marketplace-section section-pad">
+      <div class="marketplace-copy">
+        <p class="eyebrow light">BOTANICAL MARKET</p>
+        <h2>{{ tr('market.title1') }}<br><em>{{ tr('market.title2') }}</em></h2>
+        <p>{{ tr('market.description') }}</p>
+        <div class="market-stats">
+          <div><strong>{{ marketplaceSellerCount }}</strong><span>{{ tr('market.sellers') }}</span></div>
+          <div><strong>{{ marketplaceProducts.length }}</strong><span>{{ tr('market.species') }}</span></div>
+          <div><strong>{{ tr('market.ratingValue') }}</strong><span>{{ tr('market.rating') }}</span></div>
+        </div>
+        <button class="button button-sand" type="button" (click)="navigatePage('marketplace')">{{ tr('market.explore') }}</button>
+      </div>
+      <div class="seller-stack" [attr.aria-label]="tr('aria.featuredSellers')">
+        <article class="seller-card seller-one">
+          <span class="seller-avatar">RV</span>
+          <div><small>SÃO PAULO · SP</small><h3>Raízes Urbanas</h3><p>{{ tr('seller.raizes') }}</p></div>
+          <strong>{{ currentLanguage === 'fr' ? '4,9' : '4.9' }} ★</strong>
+        </article>
+        <article class="seller-card seller-two">
+          <span class="seller-avatar">FV</span>
+          <div><small>CAMPINAS · SP</small><h3>Flora da Vila</h3><p>{{ tr('seller.flora') }}</p></div>
+          <strong>{{ currentLanguage === 'fr' ? '5,0' : '5.0' }} ★</strong>
+        </article>
+        <article class="seller-card seller-three">
+          <span class="seller-avatar">CG</span>
+          <div><small>CURITIBA · PR</small><h3>Cultivo Gentil</h3><p>{{ tr('seller.cultivo') }}</p></div>
+          <strong>{{ currentLanguage === 'fr' ? '4,8' : '4.8' }} ★</strong>
+        </article>
+      </div>
+    </section>
+
+    <section id="historia" class="story-section section-pad">
+      <div class="story-art" aria-hidden="true">
+        <div class="story-image"></div>
+        <span class="story-orbit">{{ tr('story.orbit1') }}<br>• {{ tr('story.orbit2') }} •</span>
+      </div>
+      <div class="story-copy">
+        <p class="eyebrow">{{ tr('story.eyebrow') }}</p>
+        <h2>{{ tr('story.title1') }}<br><em>{{ tr('story.title2') }}</em></h2>
+        <p>{{ tr('story.description') }}</p>
+        <blockquote>{{ tr('story.quote') }}</blockquote>
+        <button class="text-link" type="button" (click)="navigatePage('essence')">{{ tr('story.cta') }} <span>→</span></button>
+      </div>
+    </section>
+
+    <section class="newsletter section-pad" aria-labelledby="newsletter-title">
+      @if (!newsletterSent) {
+        <div>
+          <p class="eyebrow light">{{ tr('newsletter.eyebrow') }}</p>
+          <h2 id="newsletter-title">{{ tr('newsletter.title1') }}<br><em>{{ tr('newsletter.title2') }}</em></h2>
+        </div>
+        <form (ngSubmit)="submitNewsletter()">
+          <label for="newsletter-email">{{ tr('newsletter.label') }}</label>
+          <div><input id="newsletter-email" name="email" type="email" autocomplete="email" required [(ngModel)]="newsletterEmail" [placeholder]="tr('newsletter.placeholder')"><button type="submit" [disabled]="newsletterLoading" [attr.aria-label]="tr('aria.subscribe')">{{ newsletterLoading ? '…' : '→' }}</button></div>
+          @if (newsletterError) { <small class="inline-error" role="alert">{{ newsletterError }}</small> }
+          <small>{{ tr('newsletter.note') }}</small>
+        </form>
+      } @else {
+        <div class="newsletter-success"><span>✓</span><div><p class="eyebrow light">{{ tr('newsletter.successEyebrow') }}</p><h2>{{ tr('newsletter.successTitle') }}</h2><p>{{ tr('newsletter.successText') }}</p></div></div>
+      }
+    </section>
+  </main>
+
+  @if (currentPage === 'shop' || currentPage === 'marketplace') {
+    <main class="catalog-page inner-page">
+      <section class="inner-hero" [class.market-hero]="currentPage === 'marketplace'">
+        <div>
+          <p class="eyebrow light">{{ currentPage === 'marketplace' ? 'BOTANICAL MARKET' : tr('shop.eyebrow') }}</p>
+          <h1>
+            @if (currentPage === 'shop') {
+              {{ copy('A living collection,', 'Une collection vivante,') }}<br><em>{{ copy('chosen with intention.', 'choisie avec intention.') }}</em>
+            } @else {
+              {{ copy('Grown nearby,', 'Cultivé tout près,') }}<br><em>{{ copy('shared with care.', 'partagé avec soin.') }}</em>
+            }
+          </h1>
+          <p>{{ currentPage === 'shop'
+            ? copy('Plants, natural scents and thoughtful tools for greener everyday rituals.', 'Plantes, parfums naturels et objets choisis pour des rituels plus verts.')
+            : copy('Meet independent growers and makers, and bring home something with a story.', 'Rencontrez des cultivateurs et artisans indépendants, et adoptez un objet qui a une histoire.') }}</p>
+        </div>
+        <span class="inner-hero-mark" aria-hidden="true">BE</span>
+      </section>
+
+      <section class="catalog-content section-pad">
+        <div class="catalog-toolbar">
+          <div>
+            <p class="eyebrow">{{ copy('EXPLORE THE COLLECTION', 'EXPLORER LA COLLECTION') }}</p>
+            <h2>{{ currentPage === 'marketplace' ? copy('From our community.', 'De notre communauté.') : copy('For a home that grows.', 'Pour une maison qui pousse.') }}</h2>
+          </div>
+          <span>{{ pageProducts.length }} {{ copy('pieces', 'articles') }}</span>
+        </div>
+        <div class="category-tabs" role="tablist" [attr.aria-label]="tr('aria.categories')">
+          @for (category of categoryIds; track category) {
+            <button type="button" role="tab" [class.active]="selectedCategory === category" [attr.aria-selected]="selectedCategory === category" (click)="filterBy(category)">{{ categoryLabel(category) }}</button>
+          }
+        </div>
+        @if (catalog.loading()) { <p class="catalog-status" role="status">{{ copy('Loading the collection…', 'Chargement de la collection…') }}</p> }
+        @if (catalog.error()) { <div class="catalog-recovery" role="alert"><p class="catalog-status error">{{ copy('The collection is temporarily unavailable.', 'La collection est temporairement indisponible.') }}</p><button class="text-link" type="button" (click)="retryCatalog()">{{ copy('Try again', 'Réessayer') }}</button></div> }
+        <div class="product-grid page-product-grid">
+          @for (product of pageProducts; track product.id) {
+            <app-product-card
+              [product]="product"
+              [displayPrice]="formatPrice(productPrice(product))"
+              [language]="currentLanguage"
+              [favorite]="favorites.has(product.id)"
+              (open)="openProductDetails($event)"
+              (favoriteToggle)="toggleFavorite($event)"
+              (add)="addToCart($event)"
+            />
+          } @empty {
+            @if (catalog.loaded() && !catalog.loading() && !catalog.error()) { <div class="empty-collection"><span>⌁</span><h3>{{ tr('shop.empty') }}</h3><button type="button" class="text-link" (click)="filterBy('all')">{{ categoryLabel('all') }}</button></div> }
+          }
+        </div>
+        @if (catalog.loaded() && catalog.page() < catalog.pages() && !catalog.error()) {
+          <button class="button button-outline centered-button" type="button" [disabled]="catalog.loadingMore()" (click)="loadMoreProducts()">{{ catalog.loadingMore() ? copy('Loading more…', 'Chargement…') : copy('Load more products', 'Charger plus de produits') }}</button>
+        }
+
+        @if (currentPage === 'marketplace') {
+          <div class="market-note">
+            <div><p class="eyebrow light">{{ copy('SELL WITH US', 'VENDRE AVEC NOUS') }}</p><h2>{{ copy('Your work deserves to be discovered.', 'Votre travail mérite d’être découvert.') }}</h2></div>
+            <p>{{ copy('Create a seller account and introduce your botanical work to a community that values origin and care.', 'Créez un compte vendeur et présentez votre travail botanique à une communauté sensible à l’origine et au soin.') }}</p>
+            <button class="button button-sand" type="button" (click)="navigatePage('account', 'register'); registerForm.role = 'seller'">{{ copy('Become a seller', 'Devenir vendeur') }}</button>
+          </div>
+        }
+      </section>
+    </main>
+  }
+
+  @if (currentPage === 'product') {
+    <main class="product-page inner-page">
+      @if (catalog.loading() || productPageLoading) {
+        <div class="product-page-status" role="status"><span></span><p>{{ copy('Loading product details…', 'Chargement de la fiche produit…') }}</p></div>
+      } @else if ((catalog.error() || productPageError) && !selectedProduct) {
+        <div class="large-empty product-not-found" role="alert"><span>⌁</span><h2>{{ copy('We could not load this product.', 'Impossible de charger ce produit.') }}</h2><p>{{ copy('Check your connection and try again.', 'Vérifiez votre connexion et réessayez.') }}</p><button class="button button-green" type="button" (click)="retryCatalog()">{{ copy('Try again', 'Réessayer') }}</button></div>
+      } @else if (productPageNotFound) {
+        <div class="large-empty product-not-found"><span>⌁</span><h2>{{ copy('This product is no longer available.', 'Ce produit n’est plus disponible.') }}</h2><p>{{ copy('Return to the collection to discover other living pieces.', 'Retournez à la collection pour découvrir d’autres pièces vivantes.') }}</p><button class="button button-green" type="button" (click)="navigatePage('shop')">{{ copy('Back to the shop', 'Retour à la boutique') }}</button></div>
+      } @else if (selectedProduct; as product) {
+        <nav class="product-breadcrumb" [attr.aria-label]="copy('Breadcrumb', 'Fil d’Ariane')"><button type="button" (click)="navigatePage(product.marketplace ? 'marketplace' : 'shop')">{{ product.marketplace ? tr('nav.marketplace') : tr('nav.shop') }}</button><span>／</span><span>{{ productName(product) }}</span></nav>
+        <article class="product-page-card">
+          <div class="product-detail-hero">
+            <div class="product-detail-image sprite-{{ product.sprite }}">@if (product.badge) { <span class="product-badge">{{ productBadge(product) }}</span> }<button class="favorite-button product-page-favorite" type="button" [class.active]="favorites.has(product.id)" [attr.aria-label]="tr(favorites.has(product.id) ? 'product.favoriteRemove' : 'product.favoriteAdd')" (click)="toggleFavorite(product.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21S3 16 3 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 9 2.5C21 16 12 21 12 21Z"></path></svg></button></div>
+            <div class="product-detail-copy">
+              <p class="eyebrow">{{ product.seller }} · {{ categoryLabel(product.category) }}</p>
+              <h1>{{ productName(product) }}</h1>
+              <button class="product-rating product-rating-large" type="button" (click)="pageReviews.scrollIntoView({ behavior: 'smooth' })"><span aria-hidden="true">{{ ratingStars(productReviewSummary.average) }}</span><small>{{ productReviewSummary.count ? productReviewSummary.average + ' / 5 · ' + productReviewSummary.count + ' ' + copy('review(s)', 'avis') : copy('Be the first to review', 'Soyez le premier à donner votre avis') }}</small></button>
+              <p class="product-detail-description">{{ productSubtitle(product) }}</p>
+              <div class="product-specs">
+                @if (product.origin) { <div><small>{{ copy('ORIGIN', 'ORIGINE') }}</small><strong>{{ product.origin }}</strong></div> }
+                @if (product.dimensions) { <div><small>{{ copy('DIMENSIONS', 'DIMENSIONS') }}</small><strong>{{ product.dimensions }}</strong></div> }
+                @if (product.materials) { <div><small>{{ copy('MATERIALS / COMPOSITION', 'MATÉRIAUX / COMPOSITION') }}</small><strong>{{ product.materials }}</strong></div> }
+                <div><small>{{ copy('AVAILABILITY', 'DISPONIBILITÉ') }}</small><strong>{{ product.stock }} {{ copy('in stock', 'en stock') }}</strong></div>
+              </div>
+              @if (product.careInstructions) { <div class="product-care"><small>{{ copy('CARE & USE', 'ENTRETIEN & UTILISATION') }}</small><p>{{ product.careInstructions }}</p></div> }
+              <div class="product-detail-buy"><strong>{{ formatPrice(productPrice(product)) }}</strong><div class="product-detail-actions"><button class="button button-outline" type="button" [disabled]="product.stock < 1" (click)="addToCart(product)">{{ copy('Add to bag', 'Ajouter au panier') }}</button><button class="button button-green" type="button" [disabled]="product.stock < 1" (click)="buyNow(product)">{{ product.stock ? copy('Buy now', 'Acheter maintenant') : copy('Out of stock', 'Épuisé') }} <span>→</span></button></div></div>
+            </div>
+          </div>
+
+          <section #pageReviews class="product-reviews-section" aria-labelledby="product-page-reviews-title">
+            <div class="reviews-heading"><div><p class="eyebrow">{{ copy('COMMUNITY NOTES', 'AVIS DE LA COMMUNAUTÉ') }}</p><h2 id="product-page-reviews-title">{{ copy('Ratings & comments', 'Notes et commentaires') }}</h2></div><div class="rating-summary"><strong>{{ productReviewSummary.average || '—' }}</strong><span><b aria-hidden="true">{{ ratingStars(productReviewSummary.average) }}</b><small>{{ productReviewSummary.count }} {{ copy('published review(s)', 'avis publié(s)') }}</small></span></div></div>
+            <div class="reviews-layout">
+              <div class="review-list">
+                @if (reviewLoading && !productReviews.length) { <p class="catalog-status" role="status">{{ copy('Loading reviews…', 'Chargement des avis…') }}</p> }
+                @if (reviewLoadError) { <div class="form-notice error" role="alert">{{ reviewLoadError }}</div> }
+                @for (review of productReviews; track review.id) { <article class="review-card"><div><span class="review-avatar">{{ review.authorName.charAt(0) }}</span><p><strong>{{ copy('Verified customer', 'Client vérifié') }}</strong><small>{{ review.updatedAt | date:'mediumDate':undefined:locale }} @if (review.verifiedPurchase) { <b>✓ {{ copy('Verified purchase', 'Achat vérifié') }}</b> }</small></p><span class="review-stars" [attr.aria-label]="review.rating + ' ' + copy('out of 5 stars', 'étoiles sur 5')">{{ ratingStars(review.rating) }}</span></div><p>{{ review.comment }}</p></article> }
+                @if (!reviewLoading && !productReviews.length) { <div class="review-empty"><span>✦</span><p>{{ copy('No comments yet. Share the first thoughtful review.', 'Aucun commentaire. Partagez le premier avis.') }}</p></div> } @if (productReviewsHasMore) { <button class="button button-outline" type="button" [disabled]="reviewLoading" (click)="loadOlderProductReviews()">{{ reviewLoading ? copy('Loading…', 'Chargement…') : copy('Load older reviews', 'Charger les avis précédents') }}</button> }
+              </div>
+              <aside class="review-compose">
+                <p class="eyebrow">{{ ownReviewStatus ? copy('YOUR REVIEW', 'VOTRE AVIS') : copy('SHARE YOUR EXPERIENCE', 'PARTAGEZ VOTRE EXPÉRIENCE') }}</p>
+                @if (!user) { <h3>{{ copy('Have you tried this product?', 'Vous avez essayé ce produit ?') }}</h3><p>{{ copy('Sign in to leave a rating and help the community choose.', 'Connectez-vous pour laisser une note et aider la communauté.') }}</p><button class="button button-outline" type="button" (click)="navigatePage('account', 'login')">{{ copy('Sign in to review', 'Se connecter pour donner un avis') }}</button> }
+                @else if (canReviewProduct) { <form (ngSubmit)="submitProductReview()"><label>{{ copy('Your rating', 'Votre note') }}</label><div class="rating-input" role="radiogroup" [attr.aria-label]="copy('Choose a rating', 'Choisir une note')">@for (star of [1, 2, 3, 4, 5]; track star) { <button type="button" role="radio" [attr.aria-checked]="reviewForm.rating === star" [class.active]="star <= reviewForm.rating" (click)="reviewForm.rating = star">★</button> }</div><label class="field"><span>{{ copy('Comment', 'Commentaire') }}</span><textarea name="pageReviewComment" rows="5" required minlength="10" maxlength="1000" [(ngModel)]="reviewForm.comment" [placeholder]="copy('Tell others about quality, presentation and use…', 'Parlez de la qualité, de la présentation et de l’usage…')"></textarea><small>{{ reviewForm.comment.length }} / 1000</small></label>@if (ownReviewStatus === 'hidden') { <div class="form-notice">{{ copy('This review is currently hidden by moderation. Your edit will remain under review.', 'Cet avis est actuellement masqué par la modération.') }}</div> }@if (reviewError) { <div class="form-notice error" role="alert">{{ reviewError }}</div> }@if (reviewSuccess) { <div class="form-notice success" role="status">✓ {{ reviewSuccess }}</div> }<button class="button button-green" type="submit" [disabled]="reviewLoading || reviewForm.comment.trim().length < 10">{{ reviewLoading ? copy('Publishing…', 'Publication…') : ownReviewStatus ? copy('Update review', 'Mettre à jour') : copy('Publish review', 'Publier l’avis') }}</button></form> }
+                @else { <h3>{{ copy('Review unavailable', 'Avis indisponible') }}</h3><p>{{ copy('A verified customer account can review products that do not belong to its own store.', 'Un compte client vérifié peut évaluer les produits qui ne lui appartiennent pas.') }}</p> }
+              </aside>
+            </div>
+          </section>
+        </article>
+      }
+    </main>
+  }
+
+  @if (currentPage === 'essence') {
+    <main class="essence-page inner-page">
+      <section class="essence-intro section-pad">
+        <div class="essence-number">01</div>
+        <div>
+          <p class="eyebrow">{{ tr('story.eyebrow') }}</p>
+          <h1>{{ copy('We believe a home', 'Nous croyons qu’une maison') }}<br><em>{{ copy('can grow with us.', 'peut grandir avec nous.') }}</em></h1>
+          <p class="lead">{{ tr('story.description') }}</p>
+        </div>
+      </section>
+      <section class="essence-image-band"><div><span>{{ copy('ROOTED IN CARE', 'ANCRÉ DANS LE SOIN') }}</span></div></section>
+      <section class="values-grid section-pad">
+        <article><span>01</span><h3>{{ copy('Origin matters', 'L’origine compte') }}</h3><p>{{ copy('We choose plants and objects whose path can be traced back to people who grow and make them responsibly.', 'Nous choisissons des plantes et objets dont le parcours mène à celles et ceux qui les cultivent et les créent avec soin.') }}</p></article>
+        <article><span>02</span><h3>{{ copy('Care is shared', 'Le soin se partage') }}</h3><p>{{ copy('Clear guidance before and after every purchase helps each new plant find its place.', 'Des conseils clairs avant et après chaque achat aident chaque nouvelle plante à trouver sa place.') }}</p></article>
+        <article><span>03</span><h3>{{ copy('Beauty takes time', 'La beauté prend du temps') }}</h3><p>{{ copy('We celebrate natural rhythm, small batches and objects designed to stay with you.', 'Nous célébrons le rythme naturel, les petites séries et les objets conçus pour durer.') }}</p></article>
+      </section>
+      <section class="essence-quote"><blockquote>{{ tr('story.quote') }}</blockquote><button class="button button-light" type="button" (click)="navigatePage('shop')">{{ tr('hero.explore') }}</button></section>
+    </main>
+  }
+
+  @if (currentPage === 'favorites') {
+    <main class="favorites-page inner-page section-pad">
+      <div class="page-heading-row"><div><p class="eyebrow">{{ copy('SAVED FOR LATER', 'GARDÉ POUR PLUS TARD') }}</p><h1>{{ copy('Your favorites.', 'Vos favoris.') }}</h1><p>{{ copy('A small collection of everything that caught your eye.', 'Une petite collection de tout ce qui a attiré votre regard.') }}</p></div><span>{{ favorites.size }}</span></div>
+      @if (favoriteProducts.length) {
+        <div class="product-grid page-product-grid">
+          @for (product of favoriteProducts; track product.id) {
+            <app-product-card
+              [product]="product"
+              [displayPrice]="formatPrice(productPrice(product))"
+              [language]="currentLanguage"
+              [favorite]="true"
+              [showBadges]="false"
+              (open)="openProductDetails($event)"
+              (favoriteToggle)="toggleFavorite($event)"
+              (add)="addToCart($event)"
+            />
+          }
+        </div>
+      } @else {
+        <div class="large-empty"><span>♡</span><h2>{{ copy('Nothing saved yet.', 'Aucun favori pour le moment.') }}</h2><p>{{ copy('Tap the heart on a piece you love and it will wait for you here.', 'Touchez le cœur d’un article aimé et il vous attendra ici.') }}</p><button class="button button-green" type="button" (click)="navigatePage('shop')">{{ tr('hero.explore') }}</button></div>
+      }
+    </main>
+  }
+
+  @if (currentPage === 'account') {
+    <main class="auth-page inner-page">
+      <section class="auth-art">
+        <div class="auth-art-copy"><p class="eyebrow light">{{ copy('A SPACE OF YOUR OWN', 'UN ESPACE À VOUS') }}</p><p class="auth-art-title">{{ copy('Keep everything you cultivate,', 'Gardez tout ce que vous cultivez,') }}<br><em>{{ copy('close at hand.', 'à portée de main.') }}</em></p><p>{{ copy('Save favorites, follow orders and, if you grow too, share your work with our community.', 'Enregistrez vos favoris, suivez vos commandes et, si vous cultivez aussi, partagez votre travail avec notre communauté.') }}</p></div>
+      </section>
+      <section class="auth-panel">
+        @if (user && authMode !== 'reset' && authMode !== 'verify') {
+          <div class="account-view">
+            <p class="eyebrow">{{ copy('MY BOTANICAL SPACE', 'MON ESPACE BOTANIQUE') }}</p>
+            <div class="account-greeting"><span>{{ user.name.charAt(0) }}</span><div><h1>{{ copy('Welcome,', 'Bienvenue,') }}<br><em>{{ user.name.split(' ')[0] }}</em></h1><p>{{ user.email }}</p></div></div>
+            @if (authSuccess) { <div class="form-notice success" role="status">✓ {{ authSuccess }}</div> }
+            <div class="account-cards">
+              <button type="button" (click)="navigatePage('favorites')"><svg viewBox="0 0 24 24"><path d="M12 21S3 16 3 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 9 2.5C21 16 12 21 12 21Z"></path></svg><span><strong>{{ copy('Favorites', 'Favoris') }}</strong><small>{{ favorites.size }} {{ tr('quick.saved') }}</small></span><b>→</b></button>
+              <div class="account-orders-card"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM7 7V4h10v3M8 11h8"></path></svg><span><strong>{{ copy('Orders', 'Commandes') }}</strong><small>{{ ordersLoading ? copy('Loading…', 'Chargement…') : ordersTotal ? orders.length + ' / ' + ordersTotal + ' ' + copy('orders loaded', 'commandes chargées') : copy('No orders yet', 'Aucune commande') }}</small></span></div>
+              @if (user.role !== 'admin') { <button type="button" (click)="navigatePage('seller')"><svg viewBox="0 0 24 24"><path d="M3 9h18l-2-5H5L3 9Zm2 0v11h14V9"></path></svg><span><strong>{{ copy('My listings', 'Mes annonces') }}</strong><small>{{ sellerStore ? managedProducts.length + ' ' + copy('item(s) for sale', 'article(s) en vente') : copy('Create your seller profile', 'Créez votre profil vendeur') }}</small></span><b>→</b></button> }
+              @if (user.role === 'admin') { <button type="button" (click)="navigatePage('admin')"><svg viewBox="0 0 24 24"><path d="M12 3 4 7v5c0 5 3 8 8 9 5-1 8-4 8-9V7l-8-4Z"></path><path d="m9 12 2 2 4-5"></path></svg><span><strong>{{ copy('Site administration', 'Administration du site') }}</strong><small>{{ copy('Manage accounts, stores and products', 'Gérez comptes, boutiques et produits') }}</small></span><b>→</b></button> }
+            </div>
+            <app-account-order-history
+              [orders]="orders"
+              [language]="currentLanguage"
+              [loading]="ordersLoading"
+              [hasMore]="ordersHasMore"
+              [error]="ordersError"
+              [withdrawalSuccess]="withdrawalSuccess"
+              [priceFormatter]="adminPriceFormatter"
+              (loadMore)="loadOlderOrders()"
+              (requestAction)="openWithdrawalRequest($event.order, $event.type)"
+            />
+            @if (withdrawalOrder) {
+              <form class="withdrawal-request-form" (ngSubmit)="submitWithdrawalRequest()">
+                <p class="eyebrow">{{ withdrawalType === 'withdrawal' ? copy('CONSUMER WITHDRAWAL', 'DROIT DE RÉTRACTATION') : copy('ORDER SUPPORT', 'AIDE SUR LA COMMANDE') }}</p>
+                <h3>{{ withdrawalType === 'withdrawal' ? copy('Request for', 'Demande pour') : copy('Tell us what happened with', 'Expliquez-nous le problème avec') }} {{ withdrawalOrder.number }}</h3>
+                <p>{{ withdrawalType === 'withdrawal' ? copy('This records a clear, timestamped notice; you do not have to give a reason. If you are withdrawing only some items, identify them in the optional details. Any legally applicable exception will be reviewed for the specific product, and we will confirm the return process before you send anything.', 'Cela enregistre une notification claire et horodatée; aucune justification n’est requise. Si votre demande concerne seulement certains articles, indiquez-les dans les informations facultatives. Toute exception légale sera examinée pour le produit concerné et la procédure sera confirmée avant tout envoi.') : copy('Describe a damage, missing item, delivery issue or other concern. This does not limit your statutory rights.', 'Décrivez un dommage, un article manquant, un problème de livraison ou toute autre difficulté. Cela ne limite pas vos droits légaux.') }}</p>
+                <label class="field"><span>{{ copy('Date goods received (optional, for review)', 'Date de réception (facultatif, pour examen)') }}</span><input name="withdrawalDeliveryDate" type="date" [(ngModel)]="withdrawalDeliveryDate"></label>
+                <label class="field"><span>{{ withdrawalType === 'problem' ? copy('Describe the issue', 'Décrivez le problème') : copy('Additional details (optional)', 'Informations complémentaires (facultatif)') }}</span><textarea name="withdrawalMessage" rows="3" maxlength="2000" [required]="withdrawalType === 'problem'" [(ngModel)]="withdrawalMessage"></textarea></label>
+                @if (withdrawalError) { <div class="form-notice error" role="alert">{{ withdrawalError }}</div> }
+                <div class="management-actions"><button class="button button-green" type="submit" [disabled]="withdrawalLoading">{{ withdrawalLoading ? copy('Recording…', 'Enregistrement…') : withdrawalType === 'withdrawal' ? copy('Submit withdrawal notice', 'Envoyer la demande de rétractation') : copy('Send support request', 'Envoyer la demande') }}</button><button class="button button-outline" type="button" (click)="closeWithdrawalRequest()" [disabled]="withdrawalLoading">{{ copy('Close', 'Fermer') }}</button></div>
+              </form>
+            }
+            <form class="profile-form" (ngSubmit)="saveProfile()">
+              <div><p class="eyebrow">{{ copy('PERSONAL PROFILE', 'PROFIL PERSONNEL') }}</p><h2>{{ copy('About you', 'À propos de vous') }}</h2></div>
+              @if (profileError) { <div class="form-notice error" role="alert">{{ profileError }}</div> }
+              @if (profileSuccess) { <div class="form-notice success" role="status">✓ {{ profileSuccess }}</div> }
+              <label class="field"><span>{{ copy('Full name', 'Nom complet') }}</span><input name="profileName" required minlength="2" maxlength="120" [(ngModel)]="profileForm.name"></label>
+              <label class="field"><span>{{ copy('About you (optional)', 'À propos de vous (facultatif)') }}</span><textarea name="profileBio" rows="3" maxlength="1000" [(ngModel)]="profileForm.bio"></textarea></label>
+              <div class="field-grid location-field-grid"><label class="field"><span>{{ copy('City', 'Ville') }}</span><input name="profileCity" maxlength="100" [(ngModel)]="profileForm.city"></label><label class="field"><span>{{ copy('Region', 'Région') }}</span><input name="profileRegion" maxlength="100" [(ngModel)]="profileForm.region"></label><label class="field"><span>{{ copy('Country', 'Pays') }}</span><input name="profileCountry" maxlength="100" [(ngModel)]="profileForm.country"></label></div>
+              <button class="button button-outline" type="submit" [disabled]="profileLoading">{{ profileLoading ? copy('Saving…', 'Enregistrement…') : copy('Save profile', 'Enregistrer le profil') }}</button>
+            </form>
+            <div class="account-details"><div><small>{{ copy('ACCOUNT TYPE', 'TYPE DE COMPTE') }}</small><strong>{{ user.role === 'seller' ? copy('Seller', 'Vendeur') : user.role === 'admin' ? copy('Administrator', 'Administrateur') : copy('Customer', 'Client') }}</strong></div><div><small>{{ copy('EMAIL STATUS', 'ÉTAT DE L’E-MAIL') }}</small><strong>{{ user.emailVerifiedAt ? copy('Verified', 'Vérifié') : copy('Not verified', 'Non vérifié') }}</strong></div></div>
+            <button class="text-link logout-link" type="button" (click)="logout()">{{ copy('Sign out', 'Se déconnecter') }}</button>
+          </div>
+        } @else {
+<app-auth-form
+            [language]="currentLanguage"
+            [authMode]="authMode"
+            [authLoading]="authLoading"
+            [authError]="authError"
+            [authSuccess]="authSuccess"
+            [authActionUrl]="authActionUrl"
+            [demoAccounts]="demoAccounts"
+            [passwordStrength]="passwordStrength"
+            [(showPassword)]="showPassword"
+            [(rememberMe)]="rememberMe"
+            [loginForm]="loginForm"
+            [registerForm]="registerForm"
+            [(forgotEmail)]="forgotEmail"
+            [resetForm]="resetForm"
+            [(verificationPassword)]="verificationPassword"
+            (navigateHome)="navigatePage('home')"
+            (switchAuth)="switchAuth($event)"
+            (submitLogin)="submitLogin()"
+            (loginAsDemo)="loginAsDemo($event)"
+            (submitRegister)="submitRegister()"
+            (submitForgotPassword)="submitForgotPassword()"
+            (submitResetPassword)="submitResetPassword()"
+            (submitVerifyEmail)="submitVerifyEmail()"
+            (openAuthAction)="openAuthAction()"
+          ></app-auth-form>
+        }
+      </section>
+    </main>
+  }
+
+  @if (currentPage === 'seller') {
+    <main class="management-page inner-page section-pad">
+      @if (!user) {
+        <div class="large-empty"><span>♙</span><h2>{{ copy('Sign in to manage your shop', 'Connectez-vous pour gérer votre boutique') }}</h2><p>{{ copy('Seller tools are protected by your verified account.', 'Les outils vendeur sont protégés par votre compte vérifié.') }}</p><button class="button button-green" type="button" (click)="navigatePage('account', 'login')">{{ copy('Sign in securely', 'Connexion sécurisée') }}</button></div>
+      } @else if (user.role === 'admin') {
+        <div class="large-empty"><span>◇</span><h2>{{ copy('Use a customer profile to sell', 'Utilisez un profil client pour vendre') }}</h2><p>{{ copy('Administrator accounts manage the marketplace from the administration panel.', 'Les comptes administrateur gèrent le marché depuis le panneau d’administration.') }}</p><button class="button button-green" type="button" (click)="navigatePage('admin')">{{ copy('Open administration', 'Ouvrir l’administration') }}</button></div>
+      } @else {
+        <app-seller-studio
+          [store]="sellerStore" [products]="managedProducts" [loading]="sellerLoading"
+          [error]="sellerError" [success]="sellerSuccess" [language]="currentLanguage"
+          [storeForm]="sellerForm" [productForm]="productForm"
+          [priceFormatter]="adminPriceFormatter" [categoryLabel]="sellerCategoryLabelFormatter"
+          (saveStore)="saveSellerStore()" (saveProduct)="saveSellerProduct()"
+          (editProduct)="editManagedProduct($event)" (archiveProduct)="archiveSellerProduct($event)"
+          (resetProductForm)="resetProductForm()" />
+      }
+    </main>
+  }
+
+  @if (currentPage === 'admin') {
+    <main class="management-page inner-page section-pad">
+      @if (!user) {
+        <div class="large-empty"><span>♙</span><h2>{{ copy('Administrator sign-in required', 'Connexion administrateur requise') }}</h2><button class="button button-green" type="button" (click)="navigatePage('account', 'login')">{{ copy('Sign in securely', 'Connexion sécurisée') }}</button></div>
+      } @else if (user.role !== 'admin') {
+        <div class="large-empty"><span>◇</span><h2>{{ copy('Administrator access only', 'Accès administrateur uniquement') }}</h2><button class="button button-green" type="button" (click)="navigatePage('account')">{{ copy('Back to my account', 'Retour à mon compte') }}</button></div>
+      } @else {
+        <div class="management-heading"><p class="eyebrow">{{ copy('SITE ADMINISTRATION', 'ADMINISTRATION DU SITE') }}</p><h1>{{ copy('Manage every', 'Gérez chaque') }}<br><em>{{ copy('living detail.', 'détail vivant.') }}</em></h1><p>{{ copy('Edit accounts, seller profiles, products, inventory and what appears publicly.', 'Modifiez les comptes, profils vendeurs, produits, stocks et publications.') }}</p></div>
+        @if (adminLoading && !adminSellers.length && !adminUsers.length) { <p class="catalog-status" role="status">{{ copy('Loading administration…', 'Chargement de l’administration…') }}</p> }
+        @if (adminError) { <div class="form-notice error management-notice" role="alert">{{ adminError }}</div> }
+        @if (adminSuccess) { <div class="form-notice success management-notice" role="status">✓ {{ adminSuccess }}</div> }
+        <app-admin-contact-inbox [messages]="adminContactMessages" [language]="currentLanguage" [loading]="adminLoading"
+          [hasMore]="adminContactMessagesHasMore" [total]="adminContactMessagesTotal" (loadMore)="loadOlderAdminContactMessages()" (changeStatus)="updateAdminContactMessage($event.message, $event.status)" />
+        <app-admin-audit-log [entries]="adminAuditEntries" [language]="currentLanguage" [loading]="adminLoading" [hasMore]="adminAuditHasMore" [total]="adminAuditTotal" (loadMore)="loadOlderAdminAuditLog()" />
+        <app-admin-financial-operations
+          [withdrawals]="adminWithdrawals" [withdrawalsTotal]="adminWithdrawalsTotal" [withdrawalsHasMore]="adminWithdrawalsHasMore"
+          [orders]="adminOrders" [ordersTotal]="adminOrdersTotal" [ordersHasMore]="adminOrdersHasMore"
+          [language]="currentLanguage" [loading]="adminLoading" [priceFormatter]="adminPriceFormatter"
+          (loadMoreWithdrawals)="loadOlderAdminWithdrawals()" (withdrawalAction)="runAdminWithdrawalAction($event.request, $event.action)"
+          (loadMoreOrders)="loadOlderAdminOrders()" (resolveCheckoutAttempt)="resolveUnattachedCheckoutAttempt($event)"
+          (refundOrderAction)="adminRefundAction($event.order, $event.action, $event.resolution)"
+          (partialRefund)="partialRefundAdminOrder($event)" (cancelOrder)="cancelAdminOrder($event)" />
+        <app-admin-disputes [disputes]="adminPaymentDisputes" [language]="currentLanguage" [loading]="adminLoading"
+          [hasMore]="adminPaymentDisputesHasMore" [total]="adminPaymentDisputesTotal" [priceFormatter]="adminPriceFormatter"
+          (loadMore)="loadOlderAdminDisputes()" />
+        <app-admin-payment-notifications [notifications]="adminPaymentNotifications" [language]="currentLanguage" [loading]="adminLoading"
+          [hasMore]="adminPaymentNotificationsHasMore" [total]="adminPaymentNotificationsTotal"
+          (loadMore)="loadOlderAdminPaymentNotifications()" (retry)="retryAdminPaymentNotification($event)" />
+        <app-admin-catalog-management
+          [users]="adminUsers" [usersTotal]="adminUsersTotal" [products]="adminProducts" [productsTotal]="adminProductsTotal"
+          [reviews]="adminReviews" [reviewsTotal]="adminReviewsTotal" [sellers]="adminSellers" [sellersTotal]="adminSellersTotal"
+          [sellersHasMore]="adminSellersHasMore" [overviewHasMore]="adminOverviewHasMore" [loading]="adminLoading" [language]="currentLanguage"
+          [editingUser]="editingAdminUser" [editingProduct]="editingAdminProduct" [editingStore]="editingAdminStore"
+          [userForm]="adminUserForm" [productForm]="adminProductForm" [storeForm]="adminStoreForm" [priceFormatter]="adminPriceFormatter"
+          (editUser)="editAdminUser($event)" (saveUser)="saveAdminUser()" (cancelUserEdit)="editingAdminUser = null"
+          (editProduct)="editAdminProduct($event)" (saveProduct)="saveAdminProduct()" (cancelProductEdit)="editingAdminProduct = null"
+          (editStore)="editAdminStore($event)" (saveStore)="saveAdminStore()" (cancelStoreEdit)="editingAdminStore = null"
+          (moderateReview)="moderateAdminReview($event.review, $event.status)"
+          (verifySeller)="setSellerVerification($event.seller, $event.verified)"
+          (loadMoreOverview)="loadOlderAdminManagement()" (loadMoreSellers)="loadOlderAdminSellers()" />
+      }
+    </main>
+  }
+
+  @if (currentPage === 'checkout') {
+    <main class="checkout-page inner-page section-pad">
+      @if (checkoutCompleted) {
+        <section class="checkout-success"><span>✓</span><p class="eyebrow">{{ checkoutIsSimulation ? copy('LOCAL TEST COMPLETE', 'TEST LOCAL TERMINÉ') : copy('PAYMENT CONFIRMED', 'PAIEMENT CONFIRMÉ') }}</p><h1>{{ copy('Your order is', 'Votre commande est') }}<br><em>{{ copy('in good hands.', 'entre de bonnes mains.') }}</em></h1><p>{{ copy('Order reference', 'Référence de commande') }} <strong>{{ checkoutOrderNumber }}</strong></p>@if (checkoutIsSimulation) { <p>{{ copy('This was a local one-cent test purchase with free shipping. No money was moved and no card data was collected.', 'Cet achat de test local à un centime incluait la livraison gratuite. Aucun argent n’a été transféré et aucune donnée de carte n’a été recueillie.') }}</p> }<div class="management-actions"><button class="button button-green" type="button" (click)="navigatePage('account')">{{ copy('View my orders', 'Voir mes commandes') }}</button><button class="button button-outline" type="button" (click)="navigatePage('shop')">{{ copy('Continue browsing', 'Continuer les achats') }}</button></div></section>
+      } @else if (!cart.length && !checkoutPending) {
+        <div class="large-empty"><span>⌑</span><h2>{{ tr('cart.emptyTitle') }}</h2><p>{{ tr('cart.emptyText') }}</p><button class="button button-green" type="button" (click)="navigatePage('shop')">{{ tr('cart.explore') }}</button></div>
+      } @else {
+        <div class="checkout-heading payment-heading"><button class="auth-back" type="button" (click)="openCart()" [disabled]="checkoutPending">← {{ copy('Review bag', 'Revoir le panier') }}</button><p class="eyebrow">{{ copy('SECURE BELGIAN CHECKOUT', 'PAIEMENT SÉCURISÉ EN BELGIQUE') }}</p><h1>{{ copy('Ready to make it', 'Prêt à le faire') }}<br><em>{{ copy('yours.', 'vôtre.') }}</em></h1><p class="checkout-lead">{{ copy('Review delivery and payment, then continue to the provider-hosted checkout. Card details never pass through our site.', 'Vérifiez la livraison et le paiement, puis continuez vers la page sécurisée du prestataire. Les données de carte ne transitent jamais par notre site.') }}</p><ol class="payment-progress" [attr.aria-label]="copy('Purchase steps', 'Étapes de l’achat')"><li class="done"><span>✓</span>{{ copy('Bag', 'Panier') }}</li><li class="active"><span>2</span>{{ copy('Details', 'Coordonnées') }}</li><li><span>3</span>{{ copy('Secure payment', 'Paiement sécurisé') }}</li></ol></div>
+        <div class="payment-preview-banner" role="note"><span>◇</span><div><strong>{{ copy('Stripe-hosted checkout when credentials are configured', 'Paiement hébergé par Stripe lorsque les clés sont configurées') }}</strong><p>{{ copy('Card authentication, including European Strong Customer Authentication, is completed by the payment provider. Local development without Stripe credentials only simulates the order and never charges.', 'L’authentification de carte, y compris l’authentification forte européenne, est gérée par le prestataire. En développement local sans clés Stripe, la commande est simulée et aucun débit n’est effectué.') }} @if (hasPaymentTestProduct) { <br><b>{{ copy('Test item: €0.01 / $0.01 · free delivery · local simulation below the provider minimum.', 'Article de test : 0,01 € / 0,01 $ · livraison gratuite · simulation locale sous le minimum du prestataire.') }}</b> }</p></div><b>{{ copy('BANCONTACT · CARDS · SEPA', 'BANCONTACT · CARTES · SEPA') }}</b></div>
+        @if (checkoutPending) {
+          <app-checkout-pending
+            [orderNumber]="pendingCheckoutOrderNumber" [orderTotal]="pendingCheckoutOrder?.total ?? null"
+            [currency]="pendingCheckoutOrder?.currency ?? currentCurrency" [error]="checkoutError"
+            [hasResumeUrl]="!!checkoutResumeUrl" [canRetry]="checkoutCanRetry" [canCancel]="checkoutCanCancel"
+            [orderCancelled]="pendingCheckoutOrder?.status === 'cancelled'" [statusLoading]="checkoutOrderStatusLoading"
+            [verificationLoading]="paymentVerificationLoading" [paymentStarting]="paymentStarting"
+            [language]="currentLanguage" [priceFormatter]="adminPriceFormatter"
+            (resume)="resumePendingCheckout()" (cancel)="cancelPendingCheckout()" />
+        }
+        @if (!checkoutPending) {
+        <div class="checkout-layout">
+          <app-checkout-details-form [fullName]="checkoutForm.name" [email]="checkoutForm.email" [authenticated]="!!user"
+            [language]="currentLanguage" [currency]="currentCurrency" [selectedMethod]="paymentPreviewMethod"
+            [rateMetadata]="catalog.currencyRateMetadata()" [euroPerDollar]="catalog.currencyRates().EUR"
+            (contactChange)="checkoutContactChanged($event)" (selectedMethodChange)="paymentPreviewMethod = $event">
+            <app-checkout-delivery [checkoutForm]="checkoutForm" [countries]="deliveryCountries" [language]="currentLanguage"
+              [shippingQuoteResponse]="shippingQuoteResponse" [shippingQuotes]="shippingQuotes" [selectedShippingQuote]="selectedShippingQuote"
+              [shippingQuoteLoading]="shippingQuoteLoading" [shippingQuoteError]="shippingQuoteError" [priceFormatter]="adminPriceFormatter"
+              (invalidateQuote)="invalidateShippingQuote()" (calculateQuote)="calculateShipping()" (selectQuote)="selectShippingQuote($event)" />
+          </app-checkout-details-form>
+          <app-checkout-order-summary
+            [language]="currentLanguage" [items]="checkoutSummaryItems"
+            [subtotalLabel]="tr('cart.subtotal')" [subtotalAmount]="formatPrice(cartTotal)"
+            [totalAmount]="formatPrice(checkoutTotal)" [shippingLoading]="shippingQuoteLoading"
+            [hasShippingQuote]="!!selectedShippingQuote"
+            [shippingAmount]="selectedShippingQuote ? formatPrice(selectedShippingQuote.amount, 'EUR') : ''"
+            (editCart)="openCart()" />
+        </div>
+        <app-checkout-final-review
+          [language]="currentLanguage" [itemCount]="cartCount"
+          [deliveryLabel]="selectedShippingQuote ? shippingLabel(selectedShippingQuote) : copy('Not calculated', 'Non calculée')"
+          [paymentMethodLabel]="paymentMethodLabel" [totalLabel]="formatPrice(checkoutTotal)"
+          [paymentReady]="!!catalog.currencyRateMetadata()?.currencyRateToken && !!shippingQuoteResponse?.tariffVersion"
+          [hasShippingQuote]="!!selectedShippingQuote" [checkoutError]="checkoutError"
+          [paymentStarting]="paymentStarting" [paymentVerificationLoading]="paymentVerificationLoading"
+          (startPurchase)="startPurchase()" (openReturns)="navigatePage('returns')" />
+        }
+      }
+    </main>
+  }
+  @if (currentPage === 'contact' || currentPage === 'deliveries' || currentPage === 'returns' || currentPage === 'terms' || currentPage === 'privacy') {
+    <app-information-pages [page]="currentPage" [language]="currentLanguage" [authenticated]="!!user" [hours]="tr('footer.hours')" [contactSent]="contactSent" [contactLoading]="contactLoading" [contactError]="contactError" [initialContactForm]="contactForm" (send)="submitContact($event)" (navigate)="navigatePage($event.page, $event.authMode)" />
+  }
+
+  @if (currentPage !== 'checkout') {
+  <footer class="footer" [class.footer-compact]="currentPage !== 'home'">
+    <div class="footer-brand">
+      <span class="exact-logo" role="img" aria-label="Botanical Essence"></span>
+      <p>{{ tr('footer.tagline') }}</p>
+    </div>
+    <div class="footer-links"><strong>{{ tr('footer.discover') }}</strong><button type="button" (click)="navigatePage('shop')">{{ tr('nav.shop') }}</button><button type="button" (click)="navigatePage('marketplace')">{{ tr('nav.marketplace') }}</button><button type="button" (click)="navigatePage('essence')">{{ tr('nav.essence') }}</button></div>
+    <div class="footer-links"><strong>{{ tr('footer.help') }}</strong><button type="button" (click)="navigatePage('contact')">{{ tr('footer.contactUs') }}</button><button type="button" (click)="navigatePage('deliveries')">{{ tr('footer.deliveries') }}</button><button type="button" (click)="navigatePage('returns')">{{ tr('footer.returns') }}</button></div>
+    <div class="footer-contact"><strong>{{ tr('footer.service') }}</strong><a href="mailto:hello@botanicalessence.be">hello@botanicalessence.be</a><span>{{ tr('footer.hours') }}</span></div>
+    <div class="footer-bottom"><span>© 2026 Botanical Essence</span><span><button type="button" (click)="navigatePage('terms')">{{ copy('Terms', 'Conditions') }}</button> · <button type="button" (click)="navigatePage('privacy')">{{ copy('Privacy', 'Confidentialité') }}</button></span><span>{{ tr('footer.flourish') }}</span></div>
+  </footer>
+
+  <nav class="mobile-bottom-nav" [attr.aria-label]="tr('aria.mobileNavigation')">
+    <button [class.active]="currentPage === 'home'" type="button" (click)="navigatePage('home')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v10h-6v-6H9v6H3Z"></path></svg><span>{{ tr('nav.home') }}</span></button>
+    <button [class.active]="currentPage === 'shop'" type="button" (click)="navigatePage('shop')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4C10 5 5 10 6 19c8 0 13-6 14-15Z"></path><path d="M4 22c3-7 8-11 13-15"></path></svg><span>{{ tr('nav.shop') }}</span></button>
+    <button [class.active]="currentPage === 'marketplace'" type="button" (click)="navigatePage('marketplace')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18l-2-5H5L3 9Zm2 0v11h14V9M9 20v-6h6v6"></path></svg><span>{{ tr('nav.market') }}</span></button>
+    <button [class.active]="currentPage === 'account'" type="button" (click)="navigatePage('account', 'login')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-5 4-7 8-7s7 2 8 7"></path></svg><span>{{ tr('nav.profile') }}</span></button>
+  </nav>
+  }
+</div>
+@if (menuOpen) {
+  <div class="backdrop" (click)="closeLayers()"></div>
+  <aside class="mobile-menu" role="dialog" aria-modal="true" tabindex="-1" [attr.aria-label]="tr('aria.mobileMenu')">
+    <div class="drawer-head"><span class="exact-logo" role="img" aria-label="Botanical Essence"></span><button type="button" [attr.aria-label]="tr('aria.closeMenu')" (click)="closeLayers()">×</button></div>
+    <div class="drawer-language">
+      <span>{{ tr('aria.language') }}</span>
+      <div class="language-switch" role="group" [attr.aria-label]="tr('aria.language')">
+        @for (language of languages; track language) {
+          <button type="button" [class.active]="currentLanguage === language" [attr.aria-pressed]="currentLanguage === language" (click)="setLanguage(language)">{{ language.toUpperCase() }}</button>
+        }
+      </div>
+    </div>
+    <div class="drawer-language drawer-currency">
+      <span>{{ tr('aria.currency') }}</span>
+      <div class="currency-switch" role="group" [attr.aria-label]="tr('aria.currency')">
+        @for (currency of currencies; track currency) {
+          <button type="button" [class.active]="currentCurrency === currency" [attr.aria-pressed]="currentCurrency === currency" (click)="setCurrency(currency)">{{ currency }}</button>
+        }
+      </div>
+    </div>
+    <nav><button type="button" (click)="navigatePage('home')"><span>01</span>{{ tr('nav.home') }}</button><button type="button" (click)="navigatePage('shop')"><span>02</span>{{ tr('nav.shop') }}</button><button type="button" (click)="navigatePage('marketplace')"><span>03</span>{{ tr('nav.marketplace') }}</button><button type="button" (click)="navigatePage('essence')"><span>04</span>{{ tr('nav.essence') }}</button><button type="button" (click)="navigatePage('favorites')"><span>05</span>{{ tr('quick.favorites') }}</button><button type="button" (click)="navigatePage('account', 'login')"><span>06</span>{{ tr('nav.profile') }}</button></nav>
+    <div class="drawer-note"><p>{{ tr('menu.note') }}</p><small>{{ tr('menu.country') }}</small></div>
+  </aside>
+}
+
+@if (searchOpen) {
+  <div class="search-layer" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="search-title">
+    <button class="layer-close" type="button" [attr.aria-label]="tr('aria.closeSearch')" (click)="closeLayers()">×</button>
+    <div class="search-content">
+      <p class="eyebrow">{{ tr('search.eyebrow') }}</p><h2 id="search-title">{{ tr('search.title') }}</h2>
+      <div class="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="search-input" type="search" [(ngModel)]="searchTerm" [attr.aria-label]="tr('search.placeholder')" [placeholder]="tr('search.placeholder')"></div>
+      @if (searchTerm && searchResults.length === 0) { <p class="search-empty">{{ tr('search.empty') }}</p> }
+      @if (searchResults.length) {
+        <div class="search-results">
+          @for (product of searchResults; track product.id) {
+            <button type="button" (click)="addToCart(product); closeLayers()"><span class="search-thumb sprite-{{ product.sprite }}"></span><span><small>{{ product.seller }}</small><strong>{{ productName(product) }}</strong><em>{{ formatPrice(productPrice(product)) }}</em></span><b>+</b></button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (cartOpen) {
+  <div class="backdrop" (click)="closeLayers()"></div>
+  <aside class="cart-drawer" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="cart-title">
+    <div class="drawer-head"><div><p class="eyebrow">{{ tr('cart.eyebrow') }}</p><h2 id="cart-title">{{ tr('cart.title') }} <span>{{ cartCount }}</span></h2></div><button type="button" [attr.aria-label]="tr('aria.closeCart')" (click)="closeLayers()">×</button></div>
+    @if (!cart.length) {
+      <div class="empty-cart"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M12 22h40l-4 34H16l-4-34Z"></path><path d="M23 26V15a9 9 0 0 1 18 0v11"></path><path d="M24 40c4 4 12 4 16 0"></path></svg><h3>{{ tr('cart.emptyTitle') }}</h3><p>{{ tr('cart.emptyText') }}</p><button class="button button-green" type="button" (click)="scrollTo('loja')">{{ tr('cart.explore') }}</button></div>
+    } @else {
+      <div class="cart-lines">
+        @for (line of cart; track line.id) {
+          <article><span class="cart-thumb sprite-{{ line.sprite }}"></span><div><small>{{ line.seller }}</small><h3>{{ productName(line) }}</h3><strong>{{ formatPrice(productPrice(line)) }}</strong><div class="quantity"><button type="button" (click)="changeQuantity(line.id, -1)">−</button><span>{{ line.quantity }}</span><button type="button" (click)="changeQuantity(line.id, 1)">+</button></div></div></article>
+        }
+      </div>
+      <div class="cart-summary"><div><span>{{ tr('cart.subtotal') }}</span><strong>{{ formatPrice(cartTotal) }}</strong></div><small>{{ tr('cart.shipping') }}</small><button class="button button-green" type="button" (click)="navigatePage('checkout')">{{ tr('cart.checkout') }}</button></div>
+    }
+  </aside>
+}
+
+@if (toast) { <div class="toast" role="status"><span>✓</span>{{ toast }}</div> }

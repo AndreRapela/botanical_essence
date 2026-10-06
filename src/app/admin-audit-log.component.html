@@ -1,0 +1,23 @@
+<section class="audit-log" aria-labelledby="admin-audit-heading">
+  <div class="audit-heading">
+    <div><p>{{ copy('SECURITY & ACCOUNTABILITY', 'SÉCURITÉ ET TRAÇABILITÉ') }}</p><h2 id="admin-audit-heading">{{ copy('Admin activity', 'Activité administrative') }}</h2></div>
+    <span>{{ entries.length }} / {{ total }}</span>
+  </div>
+  @if (!entries.length) { <p class="empty">{{ copy('No administrative changes have been recorded.', 'Aucune modification administrative enregistrée.') }}</p> }
+  @for (entry of entries; track entry.id) {
+    <article class="audit-row">
+      <div class="audit-meta"><strong>{{ actionLabel(entry.action) }}</strong><small>{{ entry.adminName || copy('Former administrator', 'Ancien administrateur') }}@if (entry.adminEmail) { · {{ entry.adminEmail }} }</small></div>
+      <span class="target">{{ entry.targetType }} #{{ entry.targetId }}</span>
+      <time [attr.datetime]="entry.createdAt">{{ entry.createdAt | date:'medium' }}</time>
+      <details class="audit-values">
+        <summary>{{ copy('View recorded changes', 'Voir les modifications enregistrées') }}</summary>
+        <div class="snapshots">
+          <div><h3>{{ copy('Before', 'Avant') }}</h3><pre>{{ snapshot(entry.previousValue) }}</pre></div>
+          <div><h3>{{ copy('After', 'Après') }}</h3><pre>{{ snapshot(entry.newValue) }}</pre></div>
+        </div>
+      </details>
+    </article>
+  }
+  @if (hasMore) { <button class="load-more" type="button" [disabled]="loading" (click)="loadMore.emit()">{{ loading ? copy('Loading…', 'Chargement…') : copy('Load older activity', 'Charger les activités précédentes') }}</button> }
+  @if (entries.length) { <p class="notice">{{ copy('Only administrators can access this history. It records account, product and other sensitive administrative changes.', 'Seuls les administrateurs peuvent consulter cet historique. Il conserve les modifications sensibles des comptes, produits et autres actions.') }}</p> }
+</section>

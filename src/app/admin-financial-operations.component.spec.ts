@@ -1,0 +1,127 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+
+import { AdminFinancialOperationsComponent } from './admin-financial-operations.component';
+import { AdminOrder, AdminWithdrawalRequest } from './storefront.models';
+
+const order: AdminOrder = {
+  id: 41,
+  number: 'BE-20261005-ORDER41',
+  customerName: 'Ana Example',
+  email: 'ana@example.test',
+  status: 'processing',
+  paymentStatus: 'pending',
+  paymentMethod: 'card',
+  paymentProvider: 'stripe',
+  testPayment: false,
+  paymentSessionAttemptedAt: null,
+  paymentSessionUnconfirmed: false,
+  paymentReconciliationRequired: false,
+  refundId: null,
+  refundAttempt: 0,
+  refundedTotalCents: 0,
+  refundAttemptIsPartial: false,
+  refundOutcome: 'none',
+  refundErrorCode: null,
+  refundErrorMessage: null,
+  refundErrorHttpStatus: null,
+  subtotal: 20,
+  shipping: 0,
+  total: 20,
+  currency: 'EUR',
+  createdAt: '2026-10-05T12:00:00Z',
+  items: [{ name: 'Monstera', quantity: 1 }]
+};
+
+const withdrawal: AdminWithdrawalRequest = {
+  id: 72,
+  requestNumber: 'WD-72',
+  requestType: 'withdrawal',
+  status: 'refund_pending',
+  customerMessage: null,
+  deliveryReceivedDate: null,
+  adminNote: null,
+  createdAt: '2026-10-05T12:00:00Z',
+  orderNumber: order.number,
+  orderStatus: 'delivered',
+  paymentStatus: 'paid',
+  paymentProvider: 'stripe',
+  refundAttempt: 1,
+  refundOutcome: 'pending',
+  refundErrorCode: null,
+  refundErrorMessage: null,
+  orderItems: 'Monstera × 1',
+  total: 20,
+  currency: 'EUR',
+  customerName: 'Ana Example',
+  email: 'ana@example.test'
+};
+
+describe('admin financial operations', () => {
+  let fixture: ComponentFixture<AdminFinancialOperationsComponent>;
+  let component: AdminFinancialOperationsComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [AdminFinancialOperationsComponent] }).compileComponents();
+    fixture = TestBed.createComponent(AdminFinancialOperationsComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('keeps cancellation unavailable while Stripe session creation is ambiguous', () => {
+    component.orders = [{ ...order, paymentSessionUnconfirmed: true }];
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    expect(text).toContain('Only retry this same order');
+    expect(buttons.some((button) => button.textContent?.includes('Cancel order'))).toBe(false);
+    expect(buttons.some((button) => button.textContent?.includes('Resolve verified unpaid attempt'))).toBe(false);
+  });
+
+  it('offers only verified-unpaid resolution for an unresolved reconciliation and emits that order', () => {
+    const unresolved = { ...order, paymentReconciliationRequired: true };
+    const handled: AdminOrder[] = [];
+    component.orders = [unresolved];
+    component.resolveCheckoutAttempt.subscribe((value) => handled.push(value));
+    fixture.detectChanges();
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const button = buttons.find((candidate) => candidate.textContent?.includes('Resolve verified unpaid attempt'));
+    expect(button).toBeDefined();
+    button?.click();
+    expect(handled).toEqual([unresolved]);
+    expect(buttons.some((candidate) => candidate.textContent?.includes('Cancel order'))).toBe(false);
+  });
+
+  it('keeps refund retry limited to terminal failures and routes pending returns to status check', () => {
+    const partial = {
+      ...order,
+      status: 'shipped',
+      paymentStatus: 'partially_refunded',
+      refundAttempt: 2,
+      refundAttemptIsPartial: true,
+      refundOutcome: 'definitive_failure' as const,
+      refundedTotalCents: 5000
+    };
+    const refundActions: Array<{ order: AdminOrder; action: string; resolution?: 'refunded' | 'not_refunded' }> = [];
+    const withdrawalActions: Array<{ request: AdminWithdrawalRequest; action: string }> = [];
+    component.orders = [partial];
+    component.withdrawals = [withdrawal];
+    component.language = 'fr';
+    component.priceFormatter = (amount, currency = 'EUR') => `${currency} ${amount.toFixed(2)}`;
+    component.refundOrderAction.subscribe((event) => refundActions.push(event));
+    component.withdrawalAction.subscribe((event) => withdrawalActions.push(event));
+    fixture.detectChanges();
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const checkRefund = buttons.find((button) => button.textContent?.includes('Consulter le remboursement'));
+    expect(checkRefund).toBeDefined();
+    expect(buttons.some((button) => button.textContent?.includes('Réessayer le remboursement'))).toBe(false);
+    checkRefund?.click();
+    buttons.find((button) => button.textContent?.includes('Vérifier le remboursement Stripe'))?.click();
+
+    expect(refundActions).toEqual([{ order: partial, action: 'check_refund' }]);
+    expect(withdrawalActions).toEqual([{ request: withdrawal, action: 'check_refund' }]);
+    expect(fixture.nativeElement.textContent).toContain('EUR 20.00');
+    expect(component.withdrawalStatusLabel('refund_pending')).toBe('Remboursement en cours de confirmation');
+  });
+});

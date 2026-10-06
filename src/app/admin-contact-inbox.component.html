@@ -1,0 +1,21 @@
+<section class="contact-inbox" aria-labelledby="admin-contact-heading">
+  <div class="inbox-heading">
+    <div><p>{{ copy('CUSTOMER SUPPORT', 'SERVICE CLIENT') }}</p><h2 id="admin-contact-heading">{{ copy('Contact inbox', 'Messages de contact') }}</h2></div>
+    <span>{{ messages.length }} / {{ total }}</span>
+  </div>
+  @if (!messages.length) { <p class="empty">{{ copy('No contact messages have been received.', 'Aucun message de contact reçu.') }}</p> }
+  @for (message of messages; track message.id) {
+    <article class="contact-row">
+      <div class="sender"><strong>{{ message.name }}</strong><a [href]="'mailto:' + message.email">{{ message.email }}</a><small>{{ subjectLabel(message.subject) }} · {{ message.createdAt | date:'medium' }}</small></div>
+      <div class="message">{{ message.message }}</div>
+      <span class="status">{{ statusLabel(message.status) }}</span>
+      <div class="actions">
+        @if (message.status === 'new') { <button type="button" [disabled]="loading" (click)="setStatus(message, 'in_progress')">{{ copy('Start handling', 'Prendre en charge') }}</button> }
+        @if (message.status === 'in_progress') { <button type="button" [disabled]="loading" (click)="setStatus(message, 'closed')">{{ copy('Close message', 'Clore le message') }}</button> }
+        @if (message.status === 'closed') { <button type="button" [disabled]="loading" (click)="setStatus(message, 'in_progress')">{{ copy('Reopen', 'Rouvrir') }}</button> }
+      </div>
+    </article>
+  }
+  @if (hasMore) { <button class="load-more" type="button" [disabled]="loading" (click)="loadMore.emit()">{{ loading ? copy('Loading…', 'Chargement…') : copy('Load older messages', 'Charger les anciens messages') }}</button> }
+  @if (messages.length) { <p class="notice">{{ copy('A durable inbox is stored in the database. Email is only an alert; a delivery failure does not remove the request.', 'La boîte de réception est conservée dans la base de données. L’e-mail n’est qu’une alerte ; son échec ne supprime pas la demande.') }}</p> }
+</section>

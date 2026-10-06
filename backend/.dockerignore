@@ -1,0 +1,15 @@
+storage
+vendor
+.git
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.dump
+**/*.sql.gz
+**/*.bak
+**/*.backup
+**/*.bdbk
+**/*.log

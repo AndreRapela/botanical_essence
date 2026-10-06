@@ -1,0 +1,35 @@
+@if (orders.length) {
+  @if (withdrawalSuccess) { <div class="form-notice success" role="status">✓ {{ withdrawalSuccess }}</div> }
+  <div class="recent-orders" aria-live="polite">
+    @for (order of orders; track order.number) {
+      <article class="account-order-entry">
+        <div>
+          <strong>{{ order.number }}</strong>
+          <small>{{ order.createdAt ? (order.createdAt | date:'mediumDate') : copy('Recent order', 'Commande récente') }}</small>
+          @if (order.fxRateDate && order.usdPerEur) { <small>{{ copy('ECB reference', 'Référence BCE') }} · {{ order.fxRateDate }} · 1 EUR = {{ order.usdPerEur | number:'1.4-4' }} USD</small> }
+          @if (order.shippingTariffReviewedAt) { <small>{{ copy('bpost tariff reviewed', 'Tarif bpost vérifié') }} · {{ order.shippingTariffReviewedAt }}</small> }
+        </div>
+        <span>{{ order.status }}</span>
+        <b>{{ priceFormatter(order.total, order.currency) }}</b>
+        @if ((order.refundedTotalCents || 0) > 0) {
+          <small class="order-refund-balance">{{ copy('Already refunded:', 'Déjà remboursé :') }} {{ priceFormatter((order.refundedTotalCents || 0) / 100, order.currency) }} · {{ copy('remaining:', 'restant :') }} {{ priceFormatter(orderRefundRemaining(order), order.currency) }}</small>
+        }
+        @if (order.withdrawalStatus) {
+          <div class="order-return-actions"><span class="withdrawal-status">{{ withdrawalStatusLabel(order.withdrawalStatus) }} · {{ order.withdrawalRequestNumber }}</span></div>
+        }
+        @if (canRequestWithdrawal(order)) {
+          <div class="order-return-actions">
+            <button type="button" (click)="askForAction(order, 'withdrawal')">{{ copy('Withdraw from this order', 'Me rétracter de cette commande') }}</button>
+            <button type="button" (click)="askForAction(order, 'problem')">{{ copy('Report a problem', 'Signaler un problème') }}</button>
+          </div>
+        }
+      </article>
+    }
+  </div>
+}
+@if (error) { <div class="form-notice error" role="alert">{{ error }}</div> }
+@if (hasMore) {
+  <button class="button button-outline" type="button" [disabled]="loading" (click)="loadMore.emit()">
+    {{ loading ? copy('Loading…', 'Chargement…') : copy('Load older orders', 'Charger les anciennes commandes') }}
+  </button>
+}

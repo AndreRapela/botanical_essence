@@ -1,0 +1,24 @@
+:host { display: block; min-width: 0; }
+.checkout-form fieldset { border: 0; border-bottom: 1px solid var(--line); margin: 0 0 34px; padding: 0 0 34px; }
+.checkout-form legend { align-items: center; display: flex; font-family: var(--serif); font-size: 25px; margin-bottom: 20px; }
+.checkout-form legend span { align-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--green-700); display: flex; font-family: var(--sans); font-size: 11px; height: 30px; justify-content: center; margin-right: 12px; width: 30px; }
+.field-grid { display: grid; gap: 15px; grid-template-columns: 1fr 1fr; }
+.field { display: block; margin: 15px 0; min-width: 0; }
+.field > span { color: var(--green-700); display: block; font-size: 12px; font-weight: 600; letter-spacing: .05em; margin-bottom: 8px; }
+.field input { background: #fff; border: 1px solid rgba(38,54,31,.2); border-radius: 2px; color: var(--ink); font-size: 15px; min-height: 54px; outline: 0; padding: 0 16px; transition: border-color .2s, box-shadow .2s; width: 100%; }
+.field input:focus { border-color: var(--green-700); box-shadow: 0 0 0 3px rgba(76,98,61,.09); }
+.field input:focus-visible { outline: 2px solid transparent; }
+.field input[readonly] { background: rgba(255,255,255,.58); color: #687163; cursor: not-allowed; }
+.payment-fieldset { border-bottom: 0 !important; margin-bottom: 15px !important; padding-bottom: 12px !important; }
+.payment-local-note { color: #697166; font-size: 12px; line-height: 1.55; margin: -8px 0 18px; max-width: 620px; }
+.payment-local-note strong { color: var(--green-800); }
+.payment-safety { align-items: center; background: rgba(143,157,123,.12); border-radius: 12px; display: flex; gap: 14px; margin-top: 12px; padding: 16px 18px; }
+.payment-safety > span { align-items: center; border: 1px solid var(--sage); border-radius: 50%; color: var(--green-700); display: flex; height: 36px; justify-content: center; min-width: 36px; }
+.payment-safety p { margin: 0; }
+.payment-safety strong, .payment-safety small { display: block; }
+.payment-safety strong { font-size: 12px; }
+.payment-safety small { color: #4f584b; font-size: 10px; line-height: 1.45; margin-top: 3px; }
+@media (max-width: 760px) {
+  .field-grid { grid-template-columns: 1fr; }
+  .checkout-form fieldset { margin-bottom: 28px; padding-bottom: 28px; }
+}
