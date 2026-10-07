@@ -21,6 +21,7 @@ require_once dirname(__DIR__) . '/src/StripeGateway.php';
 require_once dirname(__DIR__) . '/src/PaymentOrderLock.php';
 require_once dirname(__DIR__) . '/src/PaymentNotificationPolicy.php';
 require_once dirname(__DIR__) . '/src/LatePaymentRecoveryService.php';
+require_once dirname(__DIR__) . '/src/LateRefundDispatchService.php';
 require_once dirname(__DIR__) . '/src/CheckoutSessionService.php';
 require_once dirname(__DIR__) . '/src/CheckoutRecoveryService.php';
 require_once dirname(__DIR__) . '/src/CheckoutReconciliationService.php';

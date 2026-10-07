@@ -16,6 +16,7 @@ final class PaymentService
     private readonly PaymentOperationsService $operations;
     private readonly UnattachedCheckoutResolver $unattachedCheckoutResolver;
     private readonly ExternalRefundService $externalRefunds;
+    private readonly LateRefundDispatchService $lateRefundDispatch;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -28,7 +29,7 @@ final class PaymentService
     ) {
         $this->withdrawals = $withdrawals ?? new WithdrawalService($pdo, $limiter, new Mailer());
         $this->unattachedCheckoutResolver = new UnattachedCheckoutResolver($pdo);
-        $this->latePaymentRecovery = new LatePaymentRecoveryService($pdo, $this->stripe);
+        $this->latePaymentRecovery = new LatePaymentRecoveryService($pdo);
         $this->orderLock = new PaymentOrderLock($pdo);
         $this->checkout = new CheckoutSessionService(
             $pdo,
@@ -49,6 +50,9 @@ final class PaymentService
         );
         $this->externalRefunds = new ExternalRefundService($pdo, $this->stripe, $limiter, $this->orderLock,
             fn (array $refund): mixed => $this->applyRefundEvent($refund));
+        $this->lateRefundDispatch = new LateRefundDispatchService($pdo, $this->stripe, $this->orderLock,
+            fn (array $refund): mixed => $this->applyRefundEvent($refund),
+            fn (array $order): int => $this->externalRefunds->scanOrder($order));
         $this->operations = new PaymentOperationsService(
             $pdo,
             $this->stripe,
@@ -57,7 +61,8 @@ final class PaymentService
             fn (array $session, bool $paid): mixed => $this->applyCheckoutEvent($session, $paid),
             fn (int $orderId, string $status): mixed => $this->cancelUnpaidOrder($orderId, $status),
             fn (array $refund): mixed => $this->applyRefundEvent($refund),
-            recoverExternalRefunds: fn (int $limit): int => $this->externalRefunds->recover($limit)
+            recoverExternalRefunds: fn (int $limit): int => $this->externalRefunds->recover($limit),
+            dispatchLateRefunds: fn (int $limit): int => $this->lateRefundDispatch->runBatch($limit)
         );
     }
 

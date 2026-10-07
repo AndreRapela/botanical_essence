@@ -9,11 +9,13 @@ final class ExternalRefundIntegrationHarness
     use RefundAdminActions;
     use PartialRefundActions;
     public readonly ExternalRefundService $externalRefunds;
+    private readonly LatePaymentRecoveryService $latePaymentRecovery;
     private readonly object $operations;
 
     public function __construct(private readonly PDO $pdo, private readonly StripeGateway $stripe)
     {
         $this->externalRefunds = new ExternalRefundService($pdo, $stripe, new RateLimiter($pdo), new PaymentOrderLock($pdo), $this->apply(...));
+        $this->latePaymentRecovery = new LatePaymentRecoveryService($pdo);
         $this->operations = new class { public function dispatchOutbox(int $limit): void {} };
     }
 

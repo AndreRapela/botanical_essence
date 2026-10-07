@@ -25,6 +25,7 @@ require_once $source . '/PaymentOrderLock.php';
 require_once $source . '/PaymentNotificationPolicy.php';
 require_once $source . '/AdminPaymentNotificationService.php';
 require_once $source . '/LatePaymentRecoveryService.php';
+require_once $source . '/LateRefundDispatchService.php';
 require_once $source . '/CheckoutSessionService.php';
 require_once $source . '/CheckoutRecoveryService.php';
 require_once $source . '/CheckoutReconciliationService.php';

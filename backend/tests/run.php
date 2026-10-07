@@ -33,6 +33,9 @@ require_once $source . '/DisputeBackfillService.php';
 require_once $source . '/DisputeBackfillSchema.php';
 require_once $source . '/ExternalRefundService.php';
 require_once $source . '/ExternalRefundSchema.php';
+require_once $source . '/LatePaymentRecoveryService.php';
+require_once $source . '/LateRefundDispatchService.php';
+require_once $source . '/LateRefundDispatchSchema.php';
 require_once $source . '/UnattachedCheckoutResolver.php';
 require_once $source . '/PaymentWebhookActions.php';
 require_once $source . '/RefundAdminResultActions.php';
@@ -2374,6 +2377,7 @@ $tests += require __DIR__ . '/dispute-regressions.php';
 $tests += require __DIR__ . '/refund-pagination-regressions.php';
 $tests += require __DIR__ . '/refund-identity-regressions.php';
 $tests += require __DIR__ . '/external-refund-regressions.php';
+$tests += require __DIR__ . '/late-refund-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

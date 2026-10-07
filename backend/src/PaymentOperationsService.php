@@ -18,7 +18,8 @@ final class PaymentOperationsService
         private readonly ?Closure $listRefundsForPaymentIntent = null,
         private readonly ?Closure $retrieveCheckoutSession = null,
         private readonly ?Closure $retrievePaymentIntent = null,
-        private readonly ?Closure $recoverExternalRefunds = null
+        private readonly ?Closure $recoverExternalRefunds = null,
+        private readonly ?Closure $dispatchLateRefunds = null
     ) {
         $this->checkoutReconciliation = new CheckoutReconciliationService(
             $this->pdo,
@@ -36,11 +37,12 @@ final class PaymentOperationsService
         $limit = max(1, min($limit, 100));
         $reconciled = $this->checkoutReconciliation->reconcilePendingSessions($limit);
         $confirmations = $this->recoverMissingPaymentConfirmations($limit);
+        $lateRefunds = $this->dispatchLateRefunds === null ? 0 : ($this->dispatchLateRefunds)($limit);
         $refunds = $this->reconcilePendingRefunds($limit);
         $externalRefunds = $this->recoverExternalRefunds === null ? 0 : ($this->recoverExternalRefunds)($limit);
         $mail = $this->deliverConfirmationEmails($limit);
         $disputes = $this->syncDisputes($limit);
-        return ['sessions' => $reconciled, 'confirmations' => $confirmations, 'refunds' => $refunds, 'externalRefunds' => $externalRefunds, 'emails' => $mail, 'disputes' => $disputes];
+        return ['sessions' => $reconciled, 'confirmations' => $confirmations, 'lateRefunds' => $lateRefunds, 'refunds' => $refunds, 'externalRefunds' => $externalRefunds, 'emails' => $mail, 'disputes' => $disputes];
     }
 
     public function dispatchOutbox(int $limit = 20): int

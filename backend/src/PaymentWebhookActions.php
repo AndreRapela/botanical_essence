@@ -111,8 +111,8 @@ trait PaymentWebhookActions
         }
         if ($order['status'] === 'cancelled') {
             if ($paid) {
-                // Never silently discard a late success. This is a last-resort
-                // compensation path; normal cancellation expires the session first.
+                // Record a durable compensation job inside this financial transaction.
+                // Only the operations worker may send it to the provider after commit.
                 $this->latePaymentRecovery->refundCancelledOrderPayment($order, $session, $sessionId);
             }
             return;
@@ -162,8 +162,7 @@ trait PaymentWebhookActions
         }
 
         if ($cancelledOrder !== null) {
-            // Do provider-side compensation only after releasing a transaction
-            // owned by this status-check path.
+            // This status-check path queues compensation in its own short transaction.
             $this->latePaymentRecovery->refundCancelledOrderPayment($cancelledOrder, $session, $sessionId);
         }
     }

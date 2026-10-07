@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-/** Recovers and refunds Stripe payments that arrive after an order was cancelled. */
+/** Records late payments and queues compensation atomically, without provider I/O. */
 final class LatePaymentRecoveryService
 {
     public function __construct(
-        private readonly PDO $pdo,
-        private readonly StripeGateway $stripe
+        private readonly PDO $pdo
     ) {
     }
 
@@ -50,111 +49,73 @@ final class LatePaymentRecoveryService
         return $order ?: null;
     }
 
+
+    /** Queue only: the ledger, job and webhook marker must commit before any PSP I/O. */
     public function refundCancelledOrderPayment(array $order, array $session, string $sessionId): void
     {
-        $paymentIntent = $session['payment_intent'] ?? null;
-        $paymentIntentId = is_array($paymentIntent) ? (string) ($paymentIntent['id'] ?? '') : (string) $paymentIntent;
-        if ($paymentIntentId === '') {
-            throw new HttpException('A Stripe confirmou um pedido cancelado sem referência de reembolso. A reconciliação foi interrompida.', 409, [], 'late_payment_missing_intent');
+        $intent = $session['payment_intent'] ?? null;
+        $intentId = is_array($intent) ? ($intent['id'] ?? null) : $intent;
+        if (!is_string($intentId) || !preg_match('/^pi_[A-Za-z0-9_]{1,124}$/D', $intentId)) {
+            throw new HttpException('O pagamento tardio não tem uma referência Stripe válida.', 409, [], 'late_payment_missing_intent');
         }
-
-        $claim = $this->pdo->prepare(
-            "UPDATE orders SET payment_status = 'refund_pending', payment_intent_id = :paymentIntent,
-                    payment_refund_attempt = payment_refund_attempt + 1, payment_refund_id = NULL,
-                    payment_refund_outcome = 'pending', payment_refund_error_code = NULL,
-                    payment_refund_error_message = NULL, payment_refund_error_http_status = NULL,
-                    reservation_expires_at = NULL
-             WHERE id = :id AND status = 'cancelled' AND payment_session_id = :sessionId
-                   AND payment_status IN ('pending','failed','paid')"
-        );
-        $claim->execute([
-            ':paymentIntent' => $paymentIntentId,
-            ':id' => $order['id'],
-            ':sessionId' => $sessionId,
-        ]);
-
-        $lookup = $this->pdo->prepare(
-            'SELECT order_number, payment_status, payment_intent_id, payment_refund_attempt
-             FROM orders WHERE id = :id'
-        );
-        $lookup->execute([':id' => $order['id']]);
-        $current = $lookup->fetch();
-        if (!$current || $current['payment_status'] !== 'refund_pending'
-            || !hash_equals((string) $current['payment_intent_id'], $paymentIntentId)) {
-            return;
-        }
-
-        $attempt = max(1, (int) $current['payment_refund_attempt']);
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) $this->pdo->beginTransaction();
         try {
-            $refund = $this->stripe->refundPaymentIntent($paymentIntentId, (string) $current['order_number'], $attempt);
-        } catch (StripeApiException $exception) {
-            if ($exception->definitive) {
-                $this->markRefundFailed(
-                    (int) $order['id'], $attempt, $paymentIntentId, '', null,
-                    $exception->providerCode ?? ('stripe_http_' . ($exception->httpStatus ?? 'error')),
-                    $exception->providerMessage,
-                    $exception->httpStatus
-                );
-            } else {
-                $this->markRefundOutcomeUnknown(
-                    (int) $order['id'], $attempt, null,
-                    $exception->providerCode ?? 'stripe_outcome_unknown',
-                    $exception->providerMessage,
-                    $exception->httpStatus
-                );
+            $find = $this->pdo->prepare('SELECT * FROM orders WHERE id = :id FOR UPDATE');
+            $find->execute([':id' => $order['id']]);
+            $current = $find->fetch();
+            if (!$current || $current['status'] !== 'cancelled' || $current['payment_session_id'] !== $sessionId) {
+                if ($ownsTransaction) $this->pdo->commit();
+                return;
             }
-            error_log('Late payment refund outcome for order ' . $current['order_number'] . ': ' . $exception->getMessage());
-            return;
+            if (!PaymentPolicy::stripeObjectMatchesOrder($session, $current)
+                || strtolower((string) ($session['currency'] ?? '')) !== strtolower($current['currency'])
+                || ($session['amount_total'] ?? null) !== $this->cents((string) $current['total'])
+                || ($current['payment_intent_id'] !== null && $current['payment_intent_id'] !== $intentId)) {
+                throw new HttpException('O pagamento tardio não corresponde ao pedido cancelado.', 409, [], 'late_payment_mismatch');
+            }
+            // Duplicate events, manual resolutions and definitive failures never create a new attempt.
+            // Pre-ledger attempts stay available to the existing reconciliation/admin flow.
+            if ((int) $current['payment_refund_attempt'] !== 0
+                || !in_array($current['payment_status'], ['pending', 'failed', 'paid'], true)) {
+                if ($ownsTransaction) $this->pdo->commit();
+                return;
+            }
+            $amount = $this->cents((string) $current['total']) - (int) $current['payment_refunded_cents'];
+            if ($amount <= 0) throw new HttpException('O pagamento tardio exige revisão contábil.', 409, [], 'late_payment_mismatch');
+            $this->pdo->prepare("UPDATE orders SET payment_status = 'refund_pending', payment_intent_id = :intent,
+                payment_refund_attempt = 1, payment_refund_id = NULL, payment_refund_outcome = 'pending',
+                payment_refund_error_code = NULL, payment_refund_error_message = NULL,
+                payment_refund_error_http_status = NULL, reservation_expires_at = NULL WHERE id = :id")
+                ->execute([':intent' => $intentId, ':id' => $current['id']]);
+            $this->pdo->prepare("INSERT INTO payment_refund_attempts
+                (order_id, attempt, attempt_kind, amount_cents, currency, previous_payment_status,
+                 previous_order_status, status, reason)
+                VALUES (:id, 1, 'full', :amount, :currency, :previous, 'cancelled', 'pending',
+                        'Automatic compensation of payment received after cancellation')")
+                ->execute([':id' => $current['id'], ':amount' => $amount, ':currency' => $current['currency'], ':previous' => $current['payment_status']]);
+            $this->pdo->prepare('INSERT INTO payment_refund_dispatches (order_id, attempt, request_hash) VALUES (:id, 1, :hash)')
+                ->execute([':id' => $current['id'], ':hash' => self::requestHash([
+                    ...$current, 'payment_intent_id' => $intentId, 'attempt' => 1, 'amount_cents' => $amount,
+                ])]);
+            $this->pdo->prepare("INSERT INTO admin_audit_log (admin_user_id, action_name, target_type, target_id, previous_value, new_value)
+                VALUES (NULL, 'order.late_payment_refund_queued', 'order', :id, :previous, :new)")
+                ->execute([':id' => $current['id'], ':previous' => 'cancelled:' . $current['payment_status'],
+                    ':new' => 'cancelled:refund_pending; attempt=1; amount=' . $amount]);
+            if ($ownsTransaction) $this->pdo->commit();
         } catch (Throwable $exception) {
-            $this->markRefundOutcomeUnknown(
-                (int) $order['id'], $attempt, null,
-                'transport_or_response_error',
-                'No definitive response was received from the payment provider.',
-                null
-            );
-            error_log('Late payment refund is pending for order ' . $current['order_number'] . ': ' . $exception->getMessage());
-            return;
+            if ($ownsTransaction && $this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
         }
+    }
 
-        $refundId = (string) ($refund['id'] ?? '');
-        try {
-            PaymentPolicy::assertStripeRefundMatchesAttempt(
-                $refund,
-                [
-                    ...$order,
-                    'payment_provider' => 'stripe',
-                    'payment_intent_id' => $paymentIntentId,
-                    'order_number' => (string) $current['order_number'],
-                ],
-                $attempt,
-                $this->cents((string) $order['total']) - (int) ($order['payment_refunded_cents'] ?? 0)
-            );
-        } catch (Throwable $exception) {
-            $this->markRefundOutcomeUnknown(
-                (int) $order['id'], $attempt, null,
-                'stripe_refund_response_mismatch',
-                'The Stripe refund response did not match the canceled order and authorized amount.',
-                null
-            );
-            error_log('Stripe returned a mismatched late-payment refund for order ' . $current['order_number'] . ': ' . $exception->getMessage());
-            return;
-        }
-        if (($refund['status'] ?? '') === 'succeeded') {
-            $this->markRefunded((int) $order['id'], $attempt, $paymentIntentId, $refundId, null);
-        } elseif (in_array(($refund['status'] ?? ''), ['failed', 'canceled'], true)) {
-            $reason = (string) ($refund['failure_reason'] ?? (($refund['status'] ?? '') === 'canceled' ? 'refund_canceled' : 'refund_failed'));
-            $this->markRefundFailed(
-                (int) $order['id'], $attempt, $paymentIntentId, $refundId, null,
-                $reason, 'Stripe refund failed: ' . $reason, null
-            );
-        } elseif ($refundId !== '') {
-            $save = $this->pdo->prepare(
-                "UPDATE orders SET payment_refund_id = :refundId, payment_refund_outcome = 'pending'
-                 WHERE id = :id AND status = 'cancelled' AND payment_status = 'refund_pending'
-                       AND payment_refund_attempt = :attempt"
-            );
-            $save->execute([':refundId' => $refundId, ':id' => $order['id'], ':attempt' => $attempt]);
-        }
+    /** Fingerprint the fixed request and financial identity before it is ever sent. */
+    public static function requestHash(array $row): string
+    {
+        return hash('sha256', json_encode([
+            (string) $row['order_number'], (string) $row['payment_intent_id'], (int) $row['attempt'],
+            (int) $row['amount_cents'], strtoupper($row['currency']), (bool) $row['test_payment'],
+        ], JSON_THROW_ON_ERROR));
     }
 
     public function markRefunded(int $orderId, int $attempt, string $paymentIntentId, string $refundId, ?int $adminId): void
@@ -202,80 +163,6 @@ final class LatePaymentRecoveryService
             }
             throw $exception;
         }
-    }
-
-    public function markRefundFailed(
-        int $orderId,
-        int $attempt,
-        string $paymentIntentId,
-        string $refundId,
-        ?int $adminId,
-        ?string $errorCode = null,
-        ?string $errorMessage = null,
-        ?int $httpStatus = null
-    ): void
-    {
-        $update = $this->pdo->prepare(
-            "UPDATE orders SET payment_status = 'paid', payment_refund_outcome = 'definitive_failure',
-                    payment_refund_id = :refundId, payment_refund_error_code = :errorCode,
-                    payment_refund_error_message = :errorMessage, payment_refund_error_http_status = :httpStatus
-             WHERE id = :id AND status = 'cancelled' AND payment_status = 'refund_pending'
-                   AND payment_intent_id = :paymentIntent AND payment_refund_attempt = :attempt"
-        );
-        $update->execute([
-            ':refundId' => $refundId !== '' ? $refundId : null,
-            ':id' => $orderId,
-            ':paymentIntent' => $paymentIntentId,
-            ':attempt' => $attempt,
-            ':errorCode' => $this->boundedProviderCode($errorCode ?? 'refund_failed'),
-            ':errorMessage' => $this->boundedDiagnostic($errorMessage ?? 'Stripe confirmed this refund attempt failed.'),
-            ':httpStatus' => $httpStatus,
-        ]);
-        if ($update->rowCount() === 1) {
-            $audit = $this->pdo->prepare(
-                "INSERT INTO admin_audit_log
-                    (admin_user_id, action_name, target_type, target_id, previous_value, new_value)
-                 VALUES (:adminId, 'order.late_payment_refund_failed', 'order', :orderId,
-                         'cancelled:refund_pending', :newValue)"
-            );
-            $audit->execute([
-                ':adminId' => $adminId,
-                ':orderId' => $orderId,
-                ':newValue' => 'cancelled:paid:definitive_failure; ' . $this->boundedProviderCode($errorCode ?? 'refund_failed') . ': ' . $this->boundedDiagnostic($errorMessage ?? ''),
-            ]);
-        }
-    }
-
-    private function markRefundOutcomeUnknown(int $orderId, int $attempt, ?string $refundId, string $code, string $message, ?int $httpStatus): void
-    {
-        $update = $this->pdo->prepare(
-            "UPDATE orders SET payment_refund_outcome = 'unknown',
-                    payment_refund_id = COALESCE(:refundId, payment_refund_id),
-                    payment_refund_error_code = :errorCode, payment_refund_error_message = :errorMessage,
-                    payment_refund_error_http_status = :httpStatus
-             WHERE id = :id AND status = 'cancelled' AND payment_status = 'refund_pending'
-                   AND payment_refund_attempt = :attempt"
-        );
-        $update->execute([
-            ':refundId' => $refundId,
-            ':errorCode' => $this->boundedProviderCode($code),
-            ':errorMessage' => $this->boundedDiagnostic($message),
-            ':httpStatus' => $httpStatus,
-            ':id' => $orderId,
-            ':attempt' => $attempt,
-        ]);
-    }
-
-    private function boundedDiagnostic(string $message): string
-    {
-        $message = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]+/u', ' ', trim($message)) ?? '';
-        return function_exists('mb_substr') ? mb_substr($message, 0, 500) : substr($message, 0, 500);
-    }
-
-    private function boundedProviderCode(string $code): string
-    {
-        $safe = preg_replace('/[^A-Za-z0-9_.-]/', '', $code) ?? '';
-        return substr($safe !== '' ? $safe : 'provider_error', 0, 100);
     }
 
     private function cents(string $amount): int
