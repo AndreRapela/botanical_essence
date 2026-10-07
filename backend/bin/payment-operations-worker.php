@@ -31,6 +31,7 @@ require_once dirname(__DIR__) . '/src/WithdrawalPolicy.php';
 require_once dirname(__DIR__) . '/src/WithdrawalSchema.php';
 require_once dirname(__DIR__) . '/src/WithdrawalService.php';
 require_once dirname(__DIR__) . '/src/PaymentOperationsService.php';
+require_once dirname(__DIR__) . '/src/DisputeBackfillService.php';
 require_once dirname(__DIR__) . '/src/UnattachedCheckoutResolver.php';
 require_once dirname(__DIR__) . '/src/PartialRefundFailureActions.php';
 require_once dirname(__DIR__) . '/src/PartialRefundActions.php';

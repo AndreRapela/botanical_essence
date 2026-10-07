@@ -9,6 +9,7 @@ require_once __DIR__ . '/CheckoutPreparationSchema.php';
 require_once __DIR__ . '/CheckoutIdempotencySchema.php';
 require_once __DIR__ . '/WithdrawalSchema.php';
 require_once __DIR__ . '/PaymentOperationsSchema.php';
+require_once __DIR__ . '/DisputeBackfillSchema.php';
 require_once __DIR__ . '/CommerceRatesSchema.php';
 
 final class Schema
@@ -59,6 +60,7 @@ final class Schema
             CheckoutIdempotencySchema::migrate($pdo);
             WithdrawalSchema::migrate($pdo);
             PaymentOperationsSchema::migrate($pdo);
+            DisputeBackfillSchema::migrate($pdo);
             CommerceRatesSchema::migrate($pdo);
             self::applyAdminAuditSnapshotsUpgrade($pdo);
             self::syncDemoAccounts($pdo);
@@ -178,6 +180,7 @@ final class Schema
         CheckoutIdempotencySchema::migrate($pdo);
         WithdrawalSchema::migrate($pdo);
         PaymentOperationsSchema::migrate($pdo);
+        DisputeBackfillSchema::migrate($pdo);
         CommerceRatesSchema::migrate($pdo);
         self::applyAdminAuditSnapshotsUpgrade($pdo);
         self::syncDemoAccounts($pdo);

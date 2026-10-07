@@ -29,6 +29,8 @@ require_once $source . '/ShippingService.php';
 require_once $source . '/OrderService.php';
 require_once $source . '/CheckoutReconciliationService.php';
 require_once $source . '/PaymentOperationsService.php';
+require_once $source . '/DisputeBackfillService.php';
+require_once $source . '/DisputeBackfillSchema.php';
 require_once $source . '/UnattachedCheckoutResolver.php';
 require_once $source . '/PaymentWebhookActions.php';
 require_once $source . '/RefundAdminResultActions.php';
@@ -2360,64 +2362,9 @@ $tests = [
         assertSameValue(false, PaymentPolicy::validStripeSignature($payload, "t={$now},v1={$signature}", 'wrong-secret', $now));
         assertSameValue(false, PaymentPolicy::validStripeSignature($payload, "t=" . ($now - 600) . ",v1={$signature}", 'whsec_test', $now));
     },
-    'failed dispute backfill persistence retains the cursor and retries the same page' => static function (): void {
-            $pdo = new PDO('sqlite::memory:');
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $pdo->exec('CREATE TABLE payment_dispute_sync_state (id INTEGER PRIMARY KEY, created_gte INTEGER NOT NULL, starting_after TEXT NULL)');
-            $pdo->exec('CREATE TABLE recorded_disputes (id TEXT PRIMARY KEY)');
-            $pdo->exec("INSERT INTO payment_dispute_sync_state (id, created_gte, starting_after) VALUES (1, 123, 'du_previous_page')");
-            $service = new PaymentOperationsService(
-                $pdo,
-                new StripeGateway(),
-                new PaymentOrderLock($pdo),
-                new Mailer(),
-                static fn (array $session, bool $paid): mixed => null,
-                static fn (int $orderId, string $status): mixed => null,
-                static fn (array $refund): mixed => null
-            );
-            $persistPage = new ReflectionMethod(PaymentOperationsService::class, 'persistDisputeBackfillPage');
-            $response = [
-                'data' => [['id' => 'du_first'], ['id' => 'du_second']],
-                'has_more' => true,
-            ];
-            $cursor = ['created_gte' => 123, 'starting_after' => 'du_previous_page'];
-            $seenIds = [];
-            $failSecondDispute = true;
-            $persistDispute = static function (array $dispute) use ($pdo, &$seenIds, &$failSecondDispute): void {
-                $seenIds[] = $dispute['id'];
-                $save = $pdo->prepare('INSERT INTO recorded_disputes (id) VALUES (:id) ON CONFLICT(id) DO NOTHING');
-                $save->execute([':id' => $dispute['id']]);
-                if ($dispute['id'] === 'du_second' && $failSecondDispute) {
-                    throw new RuntimeException('Injected dispute persistence failure.');
-                }
-            };
-
-            try {
-                $persistPage->invoke($service, $response, $cursor, $persistDispute);
-                throw new RuntimeException('A dispute persistence failure should be reported to the worker.');
-            } catch (RuntimeException $exception) {
-                assertSameValue('Injected dispute persistence failure.', $exception->getMessage());
-            }
-
-            assertSameValue(['du_first', 'du_second'], $seenIds);
-            $state = $pdo->query('SELECT created_gte, starting_after FROM payment_dispute_sync_state WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
-            assertSameValue(123, (int) $state['created_gte']);
-            assertSameValue('du_previous_page', $state['starting_after']);
-            assertSameValue(1, (int) $pdo->query('SELECT COUNT(*) FROM recorded_disputes')->fetchColumn());
-
-            $failSecondDispute = false;
-            $result = $persistPage->invoke($service, $response, $cursor, $persistDispute);
-            assertSameValue(2, $result['synced']);
-            assertSameValue(true, $result['hasMore']);
-            assertSameValue('du_second', $result['cursor']['starting_after']);
-            assertSameValue(['du_first', 'du_second', 'du_first', 'du_second'], $seenIds);
-            $state = $pdo->query('SELECT created_gte, starting_after FROM payment_dispute_sync_state WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
-            assertSameValue(123, (int) $state['created_gte']);
-            assertSameValue('du_second', $state['starting_after']);
-            assertSameValue(2, (int) $pdo->query('SELECT COUNT(*) FROM recorded_disputes')->fetchColumn());
-    },
 ];
 
+$tests += require __DIR__ . '/dispute-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

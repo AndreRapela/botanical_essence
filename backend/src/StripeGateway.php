@@ -157,9 +157,13 @@ final class StripeGateway
         return $this->request('GET', '/disputes/' . rawurlencode($disputeId));
     }
 
-    public function listDisputes(int $createdGte, ?string $startingAfter = null): array
+    public function listDisputes(int $createdGte, ?string $startingAfter = null, ?int $createdLte = null): array
     {
+        if ($createdGte < 0 || ($createdLte !== null && $createdLte < $createdGte)) {
+            throw new InvalidArgumentException('Invalid dispute recovery time interval.');
+        }
         $query = ['limit' => 100, 'created' => ['gte' => $createdGte]];
+        if ($createdLte !== null) $query['created']['lte'] = $createdLte;
         if ($startingAfter !== null && $startingAfter !== '') {
             $query['starting_after'] = $startingAfter;
         }

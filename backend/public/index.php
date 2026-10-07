@@ -34,6 +34,7 @@ require_once $source . '/RefundAdminActions.php';
 require_once $source . '/WithdrawalPolicy.php';
 require_once $source . '/WithdrawalService.php';
 require_once $source . '/PaymentOperationsService.php';
+require_once $source . '/DisputeBackfillService.php';
 require_once $source . '/UnattachedCheckoutResolver.php';
 require_once $source . '/PartialRefundFailureActions.php';
 require_once $source . '/PartialRefundActions.php';

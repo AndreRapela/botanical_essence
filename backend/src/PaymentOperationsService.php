@@ -423,26 +423,13 @@ final class PaymentOperationsService
         if (!$this->stripe->configured()) return 0;
         $synced = 0;
         $backfillError = null;
-        $cursorQuery = $this->pdo->query('SELECT created_gte, starting_after FROM payment_dispute_sync_state WHERE id = 1');
-        $cursor = $cursorQuery->fetch();
-        if ($cursor) {
-            for ($page = 0; $page < 3; $page++) {
-                try {
-                    $response = $this->stripe->listDisputes((int) $cursor['created_gte'], is_string($cursor['starting_after']) ? $cursor['starting_after'] : null);
-                    $pageResult = $this->persistDisputeBackfillPage(
-                        $response,
-                        $cursor,
-                        function (array $dispute): void { $this->recordDispute($dispute); }
-                    );
-                    $synced += $pageResult['synced'];
-                    $cursor = $pageResult['cursor'];
-                    if (!$pageResult['hasMore']) break;
-                } catch (Throwable $exception) {
-                    $backfillError = $exception;
-                    error_log('Stripe dispute backfill paused without advancing its cursor: ' . $exception->getMessage());
-                    break;
-                }
-            }
+        try {
+            $recovery = new DisputeBackfillService($this->pdo, $this->stripe, $this->recordDispute(...));
+            $synced += $recovery->run();
+        } catch (Throwable $exception) {
+            $backfillError = $exception;
+            error_log('Stripe dispute backfill paused without advancing its cursor: '
+                . PaymentNotificationPolicy::safeDiagnostic($exception->getMessage()));
         }
 
         $open = $this->pdo->prepare(
@@ -470,7 +457,7 @@ final class PaymentOperationsService
                     throw $exception;
                 }
             } catch (Throwable $exception) {
-                    $error = PaymentNotificationPolicy::safeDiagnostic($exception->getMessage());
+                $error = PaymentNotificationPolicy::safeDiagnostic($exception->getMessage());
                 $saveError = $this->pdo->prepare('UPDATE payment_disputes SET last_synced_at = CURRENT_TIMESTAMP, last_sync_error = :error WHERE stripe_dispute_id = :id');
                 $saveError->execute([':error' => $error, ':id' => $row['stripe_dispute_id']]);
                 error_log('Stripe dispute refresh failed: ' . $error);
@@ -480,52 +467,6 @@ final class PaymentOperationsService
             throw new RuntimeException('Stripe dispute backfill failed; its cursor was retained for retry.', 0, $backfillError);
         }
         return $synced;
-    }
-
-    /** Persist every dispute in a page before saving its cursor; failures replay the whole page safely. */
-    private function persistDisputeBackfillPage(array $response, array $cursor, callable $persistDispute): array
-    {
-        $data = $response['data'] ?? null;
-        $hasMore = $response['has_more'] ?? null;
-        if (!is_array($data) || !is_bool($hasMore)) {
-            throw new RuntimeException('Stripe returned an invalid dispute page; the backfill cursor was retained.');
-        }
-        if ($hasMore && $data === []) {
-            throw new RuntimeException('Stripe returned an empty dispute page with more results; the backfill cursor was retained.');
-        }
-
-        $synced = 0;
-        foreach ($data as $dispute) {
-            if (!is_array($dispute) || !is_string($dispute['id'] ?? null) || $dispute['id'] === '') {
-                throw new RuntimeException('Stripe returned a dispute without a valid ID; the backfill cursor was retained.');
-            }
-            try {
-                $this->pdo->beginTransaction();
-                $persistDispute($dispute);
-                $this->pdo->commit();
-                $synced++;
-            } catch (Throwable $exception) {
-                if ($this->pdo->inTransaction()) $this->pdo->rollBack();
-                throw $exception;
-            }
-        }
-
-        if (!$hasMore) {
-            $createdGte = max(0, time() - 300);
-            $save = $this->pdo->prepare('UPDATE payment_dispute_sync_state SET created_gte = :createdGte, starting_after = NULL WHERE id = 1');
-            $save->execute([':createdGte' => $createdGte]);
-            $cursor = ['created_gte' => $createdGte, 'starting_after' => null];
-        } else {
-            $lastId = (string) ($data[array_key_last($data)]['id'] ?? '');
-            if ($lastId === '') {
-                throw new RuntimeException('Stripe dispute page has no pagination cursor; the backfill cursor was retained.');
-            }
-            $save = $this->pdo->prepare('UPDATE payment_dispute_sync_state SET starting_after = :startingAfter WHERE id = 1');
-            $save->execute([':startingAfter' => $lastId]);
-            $cursor['starting_after'] = $lastId;
-        }
-
-        return ['synced' => $synced, 'cursor' => $cursor, 'hasMore' => $hasMore];
     }
 
 }
