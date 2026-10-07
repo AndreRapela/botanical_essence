@@ -396,6 +396,12 @@ trait PartialRefundActions
             $orderQuery->execute([':id' => $orderId]);
             $currentOrder = $orderQuery->fetch();
             if (!$currentAttempt || !$currentOrder) throw new HttpException('O reembolso não pôde ser conciliado com o pedido.', 409);
+            // Metadata is mutable in Stripe. Once an attempt has a provider ID,
+            // no other refund may claim it, including after a terminal/manual outcome.
+            if ($currentAttempt['stripe_refund_id'] !== null
+                && !hash_equals((string) $currentAttempt['stripe_refund_id'], $refundId)) {
+                throw new HttpException('A Stripe vinculou mais de um reembolso à mesma tentativa parcial.', 409, [], 'stripe_refund_attempt_mismatch');
+            }
             if ($currentAttempt['status'] === 'succeeded') {
                 if ($ownsTransaction) $this->pdo->commit();
                 return;
