@@ -2365,6 +2365,7 @@ $tests = [
 ];
 
 $tests += require __DIR__ . '/dispute-regressions.php';
+$tests += require __DIR__ . '/refund-pagination-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

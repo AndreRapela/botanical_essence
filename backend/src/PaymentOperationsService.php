@@ -254,7 +254,7 @@ final class PaymentOperationsService
         $refunds = $this->listRefundsForPaymentIntent !== null
             ? ($this->listRefundsForPaymentIntent)($paymentIntentId)
             : $this->stripe->refundsForPaymentIntent($paymentIntentId);
-        if (!is_array($refunds)) {
+        if (!is_iterable($refunds)) {
             throw new RuntimeException('Stripe returned an invalid refund list.');
         }
         foreach ($refunds as $refund) {

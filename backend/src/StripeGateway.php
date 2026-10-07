@@ -207,11 +207,59 @@ final class StripeGateway
         return $this->request('GET', '/refunds/' . rawurlencode($refundId));
     }
 
-    public function refundsForPaymentIntent(string $paymentIntentId): array
+    /** Stream every page, but stop fetching as soon as the caller finds its attempt. */
+    public function refundsForPaymentIntent(string $paymentIntentId): Generator
     {
-        $query = http_build_query(['payment_intent' => $paymentIntentId, 'limit' => 100]);
-        $response = $this->request('GET', '/refunds?' . $query);
-        return is_array($response['data'] ?? null) ? $response['data'] : [];
+        if (preg_match('/^pi_[A-Za-z0-9]+$/D', $paymentIntentId) !== 1 || strlen($paymentIntentId) > 128) {
+            throw new InvalidArgumentException('A valid Stripe PaymentIntent ID is required for refund recovery.');
+        }
+        $createdLte = time();
+        $query = ['payment_intent' => $paymentIntentId, 'limit' => 100, 'created' => ['lte' => $createdLte]];
+        $seenCursors = [];
+        $previousPageIds = [];
+        $previousCreated = $createdLte;
+        do {
+            $response = $this->request('GET', '/refunds?' . http_build_query($query));
+            $page = $this->validateRefundPage($response, $paymentIntentId, $previousCreated, $previousPageIds, $seenCursors);
+            $hasMore = $response['has_more'];
+            $nextId = $page === [] ? null : $page[array_key_last($page)]['id'];
+            // A whole page is validated before its first candidate can affect local state.
+            foreach ($page as $refund) yield $refund;
+            if ($hasMore) {
+                $query['starting_after'] = $nextId;
+                $seenCursors[$nextId] = true;
+                $previousPageIds = array_fill_keys(array_column($page, 'id'), true);
+                $previousCreated = $page[array_key_last($page)]['created'];
+            }
+        } while ($hasMore);
+    }
+
+    private function validateRefundPage(
+        array $response, string $paymentIntentId, int $previousCreated, array $previousPageIds, array $seenCursors
+    ): array {
+        $data = $response['data'] ?? null;
+        $hasMore = $response['has_more'] ?? null;
+        if (($response['object'] ?? null) !== 'list' || !is_bool($hasMore)
+            || !is_array($data) || !array_is_list($data) || count($data) > 100 || ($hasMore && $data === [])) {
+            throw new RuntimeException('Stripe returned an invalid refund page; absence cannot be established.');
+        }
+        $pageIds = [];
+        foreach ($data as $refund) {
+            $id = is_array($refund) ? ($refund['id'] ?? null) : null;
+            $created = is_array($refund) ? ($refund['created'] ?? null) : null;
+            $intent = is_array($refund) ? ($refund['payment_intent'] ?? null) : null;
+            $intentId = is_array($intent) ? ($intent['id'] ?? null) : $intent;
+            if (!is_array($refund) || ($refund['object'] ?? null) !== 'refund'
+                || !is_string($id) || strlen($id) > 128 || preg_match('/^re_[A-Za-z0-9]+$/D', $id) !== 1
+                || isset($pageIds[$id]) || isset($previousPageIds[$id]) || isset($seenCursors[$id])
+                || !is_int($created) || $created < 0 || $created > $previousCreated
+                || !is_string($intentId) || !hash_equals($paymentIntentId, $intentId)) {
+                throw new RuntimeException('Stripe returned an invalid or non-advancing refund page; recovery remains unconfirmed.');
+            }
+            $pageIds[$id] = true;
+            $previousCreated = $created;
+        }
+        return $data;
     }
 
     private function request(string $method, string $path, array $params = [], ?string $idempotencyKey = null): array

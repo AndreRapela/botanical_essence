@@ -197,4 +197,6 @@ A recuperação de disputas usa a [paginação por cursor da Stripe](https://doc
 
 Essa migração não deve ser aplicada ao banco persistente sem um backup operacional validado. As migrações rodam na inicialização do backend: antes de atualizar/recriar esse serviço sobre dados existentes, configure o destino/cofre aprovados e execute a captura com restauração de prova descrita em “Backup e validação de restauração do MySQL”. Os testes isolados podem aplicar a migração livremente em seu próprio banco descartável.
 
+A busca de reembolsos de uma tentativa também percorre todas as [páginas da Stripe](https://docs.stripe.com/api/refunds/list), não somente os primeiros 100 resultados. Ela mantém o mesmo PaymentIntent e limite de criação durante a busca, entrega uma página validada por vez e para ao encontrar a tentativa correspondente. Uma página inválida, incompleta, sobreposta ou sem avanço de cursor não significa “reembolso inexistente”: worker e consulta administrativa preservam o estado financeiro pendente, registram o erro e não enviam outra tentativa. Uma consulta que não encontre a tentativa só termina normalmente após uma página válida com `has_more=false`; ausência momentânea também não autoriza reenvio.
+
 O relatório de segurança, incluindo os riscos corrigidos e as dependências restantes para produção, está em [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md).
