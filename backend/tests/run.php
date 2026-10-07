@@ -31,6 +31,8 @@ require_once $source . '/CheckoutReconciliationService.php';
 require_once $source . '/PaymentOperationsService.php';
 require_once $source . '/DisputeBackfillService.php';
 require_once $source . '/DisputeBackfillSchema.php';
+require_once $source . '/ExternalRefundService.php';
+require_once $source . '/ExternalRefundSchema.php';
 require_once $source . '/UnattachedCheckoutResolver.php';
 require_once $source . '/PaymentWebhookActions.php';
 require_once $source . '/RefundAdminResultActions.php';
@@ -74,6 +76,10 @@ final class FullRefundWebhookTestHarness
     use PartialRefundActions;
 
     public function __construct(private readonly PDO $pdo) {}
+
+    // These ledger-only scenarios replace provider transport and external-queue routing.
+    protected function verifyProviderRefundLedger(array $order): void {}
+    protected function captureUnmatchedRefund(array $refund): void {}
 
     public function apply(array $refund): void
     {
@@ -2367,6 +2373,7 @@ $tests = [
 $tests += require __DIR__ . '/dispute-regressions.php';
 $tests += require __DIR__ . '/refund-pagination-regressions.php';
 $tests += require __DIR__ . '/refund-identity-regressions.php';
+$tests += require __DIR__ . '/external-refund-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

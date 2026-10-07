@@ -119,7 +119,7 @@ final class PaymentPolicy
     }
 
     /** Reject a Stripe refund unless it exactly matches a refund attempt created for this order. */
-    public static function assertStripeRefundMatchesAttempt(array $refund, array $order, int $attempt, int $expectedAmountCents): void
+    public static function assertStripeRefundMatchesAttempt(array $refund, array $order, int $attempt, int $expectedAmountCents, ?string $boundRefundId = null): void
     {
         $paymentIntent = $refund['payment_intent'] ?? null;
         $paymentIntentId = is_array($paymentIntent)
@@ -137,11 +137,14 @@ final class PaymentPolicy
             throw new HttpException('O reembolso Stripe não corresponde ao pagamento e ao ambiente deste pedido.', 409, [], 'stripe_refund_mismatch');
         }
 
-        if (!is_array($metadata)
+        if ($boundRefundId !== null && !hash_equals($boundRefundId, (string) $refund['id'])) {
+            throw new HttpException('A referência Stripe diverge da tentativa vinculada.', 409, [], 'stripe_refund_attempt_mismatch');
+        }
+        if ($boundRefundId === null && (!is_array($metadata)
             || !is_string($order['order_number'] ?? null)
             || !hash_equals((string) $order['order_number'], (string) ($metadata['order_number'] ?? ''))
             || !(is_int($metadataAttempt) || (is_string($metadataAttempt) && ctype_digit($metadataAttempt)))
-            || (int) $metadataAttempt !== $attempt) {
+            || (int) $metadataAttempt !== $attempt)) {
             throw new HttpException('A tentativa de reembolso Stripe não corresponde ao pedido.', 409, [], 'stripe_refund_attempt_mismatch');
         }
 

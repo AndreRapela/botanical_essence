@@ -10,6 +10,10 @@ final class PartialRefundIdentityHarness
 
     private readonly object $operations;
 
+    // External-queue persistence is covered by its integration suite; keep this
+    // fixture focused on transaction rollback of the financial application.
+    protected function captureUnmatchedRefund(array $refund): void {}
+
     public function __construct(private readonly PDO $pdo)
     {
         $this->operations = new class {

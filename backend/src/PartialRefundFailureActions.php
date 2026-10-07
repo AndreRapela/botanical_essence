@@ -21,7 +21,8 @@ trait PartialRefundFailureActions
             $ledger = $this->pdo->prepare(
                 'UPDATE payment_refund_attempts SET stripe_refund_id = COALESCE(:refundId, stripe_refund_id),
                         status = :status, provider_error_code = :errorCode, provider_error_message = :errorMessage
-                 WHERE order_id = :orderId AND attempt = :attempt AND status IN (\'pending\',\'unknown\')'
+                 WHERE order_id = :orderId AND attempt = :attempt AND (status IN (\'pending\',\'unknown\')
+                    OR (status = \'failed\' AND :refreshFailure = 1 AND stripe_refund_id = :knownRefundId))'
             );
             $ledger->execute([
                 ':refundId' => $refundId,
@@ -30,7 +31,13 @@ trait PartialRefundFailureActions
                 ':errorMessage' => substr(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $errorMessage) ?? 'Provider refund failed.', 0, 500),
                 ':orderId' => $order['id'],
                 ':attempt' => $attempt,
+                ':refreshFailure' => $unknown ? 0 : 1,
+                ':knownRefundId' => $refundId,
             ]);
+            if ($ledger->rowCount() !== 1) {
+                if ($ownsTransaction) $this->pdo->commit();
+                return;
+            }
             if (!$unknown) {
                 $returnQuery = $this->pdo->prepare('SELECT withdrawal_request_id FROM payment_refund_attempts WHERE order_id = :orderId AND attempt = :attempt');
                 $returnQuery->execute([':orderId' => $order['id'], ':attempt' => $attempt]);
@@ -49,15 +56,16 @@ trait PartialRefundFailureActions
             }
             if (!$unknown) {
                 $restore = $this->pdo->prepare(
-                    "UPDATE orders SET payment_status = (
-                     SELECT previous_payment_status FROM payment_refund_attempts WHERE order_id = :orderId AND attempt = :attemptLookup
-                        ), payment_refund_outcome = 'definitive_failure', payment_refund_id = COALESCE(:refundId, payment_refund_id),
+                    "UPDATE orders SET payment_status = IF(payment_refunded_cents >= ROUND(total * 100), 'refunded',
+                        IF(payment_refunded_cents > 0, 'partially_refunded', 'paid')),
+                        payment_refund_outcome = 'definitive_failure', payment_refund_id = COALESCE(:refundId, payment_refund_id),
                         payment_refund_error_code = :errorCode, payment_refund_error_message = :errorMessage,
                         payment_refund_error_http_status = NULL
-                     WHERE id = :id AND payment_status = 'refund_pending' AND payment_refund_attempt = :attemptCurrent"
+                     WHERE id = :id AND (payment_status = 'refund_pending' OR payment_refund_outcome = 'definitive_failure')
+                        AND payment_refund_attempt = :attemptCurrent"
                 );
                 $restore->execute([
-                    ':orderId' => $order['id'], ':attemptLookup' => $attempt, ':refundId' => $refundId,
+                    ':refundId' => $refundId,
                     ':errorCode' => substr(preg_replace('/[^A-Za-z0-9_.-]/', '', $errorCode) ?: 'provider_error', 0, 100),
                     ':errorMessage' => substr(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $errorMessage) ?? 'Provider refund failed.', 0, 500),
                     ':id' => $order['id'], ':attemptCurrent' => $attempt,

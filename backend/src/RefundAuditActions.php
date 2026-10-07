@@ -5,6 +5,12 @@ declare(strict_types=1);
 /** Focused payment-domain operations extracted from the payment facade. */
 trait RefundAuditActions
 {
+    protected function verifyProviderRefundLedger(array $order): void
+    {
+        $this->externalRefunds->scanOrder($order);
+        ExternalRefundService::assertReconciled($this->pdo, (int) $order['id']);
+    }
+
     private function auditRefundState(?int $adminId, int $orderId, string $action, string $previous, string $new, string $detail): void
     {
         $audit = $this->pdo->prepare(

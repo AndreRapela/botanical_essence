@@ -96,6 +96,9 @@
         @if (order.refundErrorCode) {
           <small class="admin-warning" role="note"><b>{{ copy('Refund issue', 'Problème de remboursement') }}: {{ order.refundErrorCode }}@if (order.refundErrorHttpStatus) { · HTTP {{ order.refundErrorHttpStatus }} }</b> {{ order.refundErrorMessage }}</small>
         }
+        @if (order.externalRefundUnmatched || order.refundScanError) {
+          <small class="admin-warning" role="alert">{{ order.externalRefundUnmatched ? copy('External Stripe refund needs reconciliation. Do not refund again; review the financial reconciliation queue.', 'Un remboursement Stripe externe nécessite un rapprochement. Ne remboursez pas à nouveau ; vérifiez la liste de rapprochement financier.') : copy('Stripe refund history could not be verified. Check the provider before another refund.', 'L’historique des remboursements Stripe n’a pas pu être vérifié. Consultez le prestataire avant tout nouveau remboursement.') }}</small>
+        }
         @if (order.paymentSessionUnconfirmed || order.paymentReconciliationRequired) {
           <small class="admin-warning" role="alert">{{ order.status === 'cancelled' ? copy('This order was cancelled without confirming whether Stripe created a session. Check Stripe for a late payment and refund it if necessary.', 'Cette commande a été annulée sans confirmer si Stripe avait créé une session. Vérifiez les paiements tardifs dans Stripe et remboursez-les si nécessaire.') : order.paymentReconciliationRequired ? copy('Stripe checkout session is unresolved. Verify the order reference in Stripe before cancelling; inventory remains reserved.', 'La session Stripe reste introuvable. Vérifiez la référence de commande dans Stripe avant toute annulation ; le stock reste réservé.') : copy('Stripe has not confirmed whether checkout was created. Only retry this same order; do not start a second purchase.', 'Stripe n’a pas confirmé si la session a été créée. Reprenez uniquement cette commande ; n’en créez pas une seconde.') }}</small>
         }
@@ -118,19 +121,19 @@
         }
         @if (order.paymentProvider === 'stripe' && order.refundAttempt > 0 && ['refund_pending', 'paid', 'partially_refunded'].includes(order.paymentStatus) && (!['shipped', 'delivered'].includes(order.status) || order.refundAttemptIsPartial)) {
           <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'check_refund' })">{{ copy('Check refund', 'Consulter le remboursement') }}</button>
-          @if (!order.refundAttemptIsPartial && order.paymentStatus === 'paid' && ['definitive_failure', 'manual_not_refunded'].includes(order.refundOutcome)) {
+          @if (!order.externalRefundUnmatched && !order.refundAttemptIsPartial && order.paymentStatus === 'paid' && ['definitive_failure', 'manual_not_refunded'].includes(order.refundOutcome)) {
             <button class="danger-link" type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'retry_refund' })">{{ copy('Retry refund', 'Réessayer le remboursement') }}</button>
           }
           <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'refunded' })">{{ copy('Resolve as refunded', 'Marquer comme remboursé') }}</button>
           <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'not_refunded' })">{{ copy('Resolve as not refunded', 'Marquer comme non remboursé') }}</button>
         }
-        @if (order.paymentProvider === 'stripe' && ['paid', 'partially_refunded'].includes(order.paymentStatus)) {
+        @if (!order.externalRefundUnmatched && order.paymentProvider === 'stripe' && ['paid', 'partially_refunded'].includes(order.paymentStatus)) {
           <button type="button" [disabled]="loading" (click)="partialRefund.emit(order)">{{ copy('Partial refund', 'Remboursement partiel') }}</button>
         }
-        @if (!order.paymentSessionUnconfirmed && !order.paymentReconciliationRequired && !['shipped', 'delivered', 'cancelled'].includes(order.status) && !['refund_pending', 'partially_refunded'].includes(order.paymentStatus)) {
+        @if (!order.externalRefundUnmatched && !order.paymentSessionUnconfirmed && !order.paymentReconciliationRequired && !['shipped', 'delivered', 'cancelled'].includes(order.status) && !['refund_pending', 'partially_refunded'].includes(order.paymentStatus)) {
           <button class="danger-link" type="button" [disabled]="loading" (click)="cancelOrder.emit(order)">{{ order.paymentProvider === 'local_test' && order.testPayment ? copy('Cancel test order', 'Annuler la commande de test') : order.paymentStatus === 'paid' ? copy('Cancel & refund', 'Annuler et rembourser') : copy('Cancel order', 'Annuler') }}</button>
         }
-        @if (order.status === 'cancelled' && order.paymentProvider === 'stripe' && order.paymentStatus === 'paid' && order.refundAttempt === 0) {
+        @if (!order.externalRefundUnmatched && order.status === 'cancelled' && order.paymentProvider === 'stripe' && order.paymentStatus === 'paid' && order.refundAttempt === 0) {
           <button class="danger-link" type="button" [disabled]="loading" (click)="cancelOrder.emit(order)">{{ copy('Start refund', 'Démarrer le remboursement') }}</button>
         }
       </div>

@@ -1,0 +1,42 @@
+<section aria-labelledby="refund-reconciliation-heading" [attr.aria-busy]="busy">
+  <div class="heading">
+    <div><p class="eyebrow">{{ copy('FINANCIAL RECONCILIATION', 'RAPPROCHEMENT FINANCIER') }}</p><h2 id="refund-reconciliation-heading">{{ copy('Refunds needing review', 'Remboursements à vérifier') }}</h2></div>
+    <button type="button" [disabled]="busy" (click)="load()">{{ copy('Refresh', 'Actualiser') }}</button>
+  </div>
+  <p class="intro">{{ copy('These Stripe refunds need a local accounting review. New refunds for the affected order are blocked until reviewed. Linking a manually counted attempt will not add the amount twice.', 'Ces remboursements Stripe nécessitent une vérification comptable locale. Les nouveaux remboursements de la commande sont bloqués jusqu’à vérification. Rattacher une tentative déjà comptabilisée ne compte pas le montant deux fois.') }}</p>
+  @if (error) { <p class="notice error" role="alert">{{ error }}</p> }
+  @if (success) { <p class="notice success" role="status">{{ success }}</p> }
+  @if (!issues.length) { <p class="empty" role="status">{{ busy ? copy('Loading reconciliation…', 'Chargement du rapprochement…') : copy('No unmatched refunds currently recorded.', 'Aucun remboursement non rapproché enregistré.') }}</p> }
+  @for (issue of issues; track issue.refundId) {
+    <article class="refund-row">
+      <div><strong>{{ issue.orderNumber ?? copy('No linked order', 'Aucune commande liée') }}</strong><small>{{ issue.refundId }}</small><small>{{ issue.paymentIntentId ?? '—' }}</small></div>
+      <div><strong>{{ money(issue) }}</strong><small>{{ statusLabel(issue.providerStatus) }}</small><small>{{ copy('Observed', 'Observé') }} {{ issue.lastSyncedAt | date:'yyyy-MM-dd HH:mm':'+0000' }} UTC</small></div>
+      <button type="button" [disabled]="busy" (click)="open(issue)">{{ copy('Review & reconcile', 'Vérifier et rapprocher') }}</button>
+      @if (selected?.refundId === issue.refundId) {
+        <form class="review" (ngSubmit)="submit()">
+          <p class="safety">{{ copy('This records accounting only. It does not send money, cancel delivery or put goods back in stock.', 'Cette action comptabilise uniquement. Elle n’envoie pas d’argent, n’annule pas la livraison et ne remet pas les articles en stock.') }}</p>
+          <label [for]="'resolution-' + issue.refundId">{{ copy('Resolution', 'Résolution') }}</label>
+          <select [id]="'resolution-' + issue.refundId" name="resolution" [(ngModel)]="action" [disabled]="busy" (ngModelChange)="acknowledged = false">
+            <option value="link" [disabled]="!candidates(issue).length">{{ copy('Link an existing attempt', 'Rattacher une tentative') }}</option>
+            <option value="record" [disabled]="issue.orderId === null || issue.providerStatus !== 'succeeded'">{{ copy('Record an external refund', 'Comptabiliser un remboursement') }}</option>
+            <option value="dismiss" [disabled]="!canDismiss(issue)">{{ copy('Close failed / outside case', 'Clôturer un cas échoué / externe') }}</option>
+            <option value="reverse" [disabled]="!reversalCandidates(issue).length || !['failed','canceled','requires_action'].includes(issue.providerStatus)">{{ copy('Correct a returned refund', 'Corriger un remboursement retourné') }}</option>
+          </select>
+          <p class="action-detail" role="status">{{ actionDetail() }}</p>
+          @if (action === 'link' || action === 'reverse') {
+            <label [for]="'attempt-' + issue.refundId">{{ copy('Matching local attempt', 'Tentative locale correspondante') }}</label>
+            <select [id]="'attempt-' + issue.refundId" name="attempt" [(ngModel)]="attempt" [disabled]="busy">
+              @for (candidate of (action === 'reverse' ? reversalCandidates(issue) : candidates(issue)); track candidate.attempt) { <option [ngValue]="candidate.attempt">#{{ candidate.attempt }} · {{ candidate.alreadyCounted ? copy('already counted', 'déjà comptabilisé') : statusLabel(candidate.status) }}</option> }
+            </select>
+          }
+          <label [for]="'reason-' + issue.refundId">{{ copy('Audit reason', 'Motif pour l’audit') }}</label>
+          <textarea [id]="'reason-' + issue.refundId" name="reason" [(ngModel)]="reason" required minlength="10" maxlength="450" rows="3" [disabled]="busy"></textarea>
+          <label class="confirmation"><input type="checkbox" name="reviewed" [(ngModel)]="acknowledged" [disabled]="busy">{{ copy('I checked the original payment and refund in Stripe and verified whether this amount was already counted.', 'J’ai vérifié le paiement et le remboursement dans Stripe ainsi que leur comptabilisation antérieure.') }}</label>
+          <div class="actions"><button type="button" [disabled]="busy" (click)="selected = null">{{ copy('Back', 'Retour') }}</button><button class="primary" type="submit" [disabled]="busy || !acknowledged">{{ copy('Confirm reconciliation', 'Confirmer le rapprochement') }}</button></div>
+        </form>
+      }
+    </article>
+  }
+  @if (hasMore) { <button type="button" [disabled]="busy" (click)="load(true)">{{ copy('Load more cases', 'Charger d’autres cas') }}</button> }
+  @if (issues.length) { <p class="count">{{ issues.length }} / {{ total }}</p> }
+</section>

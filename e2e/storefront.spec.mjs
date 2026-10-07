@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const pagesToCheck = [
   '/',
@@ -131,6 +132,44 @@ test('seller demo account opens the protected seller workspace', async ({ page }
   await expect(page).toHaveURL(/\/seller$/);
   await expect(page.locator('main:visible').first()).toBeVisible();
   await expect(page.locator('main:visible').first()).toContainText(/store|boutique|product|produit/i);
+});
+
+test('administrator reviews an external refund in an accessible mobile form without sending another refund', async ({ page }, testInfo) => {
+  let reviewed = false;
+  const issue = { refundId: 're_preview1', orderId: 1, orderNumber: 'PREVIEW-REFUND', paymentIntentId: 'pi_preview1',
+    amountCents: 2500, currency: 'EUR', providerStatus: 'succeeded', resolution: 'unmatched',
+    createdAt: '2026-10-07T10:00:00Z', lastSyncedAt: '2026-10-07T10:00:00Z',
+    attempts: [{ attempt: 1, kind: 'partial', amountCents: 2500, currency: 'EUR', status: 'manual', refundId: null, alreadyCounted: true }] };
+  await page.route('**/api/admin/refund-reconciliation?*', (route) => route.fulfill({ json: { data: reviewed ? [] : [issue], page: 1, limit: 50, total: reviewed ? 0 : 1, hasMore: false } }));
+  await page.route('**/api/admin/refund-reconciliation/resolve', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().postDataJSON()).toEqual({ refundId: 're_preview1', action: 'link', attempt: 1, reason: 'Verified the original manually counted refund' });
+    reviewed = true;
+    await route.fulfill({ json: { message: 'Reconciliation recorded; no provider operation was sent.' } });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAs(page, /enter as administrator|entrer comme administrateur/i);
+  const queue = page.locator('app-admin-refund-reconciliation');
+  await expect(queue).toContainText('PREVIEW-REFUND');
+  await queue.getByRole('button', { name: /review & reconcile|vérifier et rapprocher/i }).click();
+  await expect(queue.locator('form')).toBeVisible();
+  await expect(queue).toContainText(/does not send money|n’envoie pas d’argent/i);
+  const audit = await new AxeBuilder({ page }).include('app-admin-refund-reconciliation').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(audit.violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await queue.screenshot({ path: testInfo.outputPath('external-refund-review-mobile.png') });
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  }
+  await queue.screenshot({ path: testInfo.outputPath('external-refund-review-desktop.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await queue.getByLabel(/audit reason|motif pour l’audit/i).fill('Verified the original manually counted refund');
+  await queue.getByRole('checkbox').check();
+  await queue.getByRole('button', { name: /confirm reconciliation|confirmer le rapprochement/i }).click();
+  await expect(queue).toContainText(/No new Stripe refund was sent|Aucun nouveau remboursement Stripe/i);
+  await expect(queue).not.toContainText('PREVIEW-REFUND');
+  expect(reviewed).toBe(true);
 });
 
 test('standard product badges follow the selected language in catalog and product pages', async ({ page }) => {

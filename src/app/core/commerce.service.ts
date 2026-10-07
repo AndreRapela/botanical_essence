@@ -4,10 +4,19 @@ import { Observable } from 'rxjs';
 
 import { AccountProfile, AdminAuditEntry, AdminContactMessage, AdminOrder, AdminOverviewPage, AdminPaymentDispute, AdminPaymentNotification, AdminProduct, AdminReview, AdminSeller, AdminUser, AdminWithdrawalRequest, AuthUser, ContactMessageInput, ManagedProduct, MarketplaceStore, OrderSummary, ProductReviewResponse, ShippingQuoteResponse } from '../storefront.models';
 import { AuthService } from './auth.service';
+import type { ExternalRefundIssue } from '../storefront.models';
 
 @Injectable({ providedIn: 'root' })
 export class CommerceService {
   constructor(private readonly http: HttpClient, private readonly auth: AuthService) {}
+
+  externalRefundIssues(page = 1): Observable<{ data: ExternalRefundIssue[]; page: number; limit: number; total: number; hasMore: boolean }> {
+    return this.http.get<{ data: ExternalRefundIssue[]; page: number; limit: number; total: number; hasMore: boolean }>('/api/admin/refund-reconciliation', { params: { page, limit: 50 } });
+  }
+
+  resolveExternalRefund(refundId: string, action: 'link' | 'record' | 'dismiss' | 'reverse', reason: string, attempt?: number): Observable<{ message: string }> {
+    return this.auth.postWithCsrf<{ message: string }>('/api/admin/refund-reconciliation/resolve', { refundId, action, reason, ...(attempt === undefined ? {} : { attempt }) });
+  }
 
   createOrder(input: Record<string, unknown>): Observable<{ order: OrderSummary; checkoutUrl: string | null; simulated?: boolean; alreadyPaid?: boolean }> {
     return this.auth.postWithCsrf<{ order: OrderSummary; checkoutUrl: string | null; simulated?: boolean; alreadyPaid?: boolean }>('/api/orders', input);

@@ -159,6 +159,13 @@ test('withdrawal submission requires an authenticated owner and admin actions re
   assert(disputes.response.status === 401, `anonymous dispute queue returned ${disputes.response.status}`);
   const paymentNotifications = await client.json('/api/admin/payment-notifications');
   assert(paymentNotifications.response.status === 401, `anonymous payment notification queue returned ${paymentNotifications.response.status}`);
+  const externalRefunds = await client.json('/api/admin/refund-reconciliation');
+  assert(externalRefunds.response.status === 401, 'anonymous external refund queue was not protected');
+  const externalResolution = await client.json('/api/admin/refund-reconciliation/resolve', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+    body: JSON.stringify({ refundId: 're_test', action: 'record', reason: 'Unauthorized external refund review' })
+  });
+  assert(externalResolution.response.status === 401, 'anonymous external refund resolution was not protected');
   const partialRefund = await client.json('/api/admin/orders/refund', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
@@ -263,7 +270,14 @@ test('CORS allowlist and role authorization are enforced', async () => {
   assert(auditLog.response.status === 403, `customer audit log access returned ${auditLog.response.status}`);
   const paymentNotifications = await client.json('/api/admin/payment-notifications');
   assert(paymentNotifications.response.status === 403, `customer payment notification access returned ${paymentNotifications.response.status}`);
+  const externalRefunds = await client.json('/api/admin/refund-reconciliation');
+  assert(externalRefunds.response.status === 403, 'customer external refund queue was not forbidden');
   const afterLogin = await client.json('/api/auth/session');
+  const externalResolution = await client.json('/api/admin/refund-reconciliation/resolve', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': afterLogin.body.csrfToken },
+    body: JSON.stringify({ refundId: 're_test', action: 'record', reason: 'Unauthorized external refund review' })
+  });
+  assert(externalResolution.response.status === 403, 'customer external refund resolution was not forbidden');
   const userMutation = await client.json('/api/admin/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': afterLogin.body.csrfToken },
@@ -304,6 +318,11 @@ test('administrator can load orders for manual shipping follow-up', async () => 
   const orders = await client.json('/api/admin/orders');
   assert(orders.response.status === 200, `admin orders returned ${orders.response.status}`);
   assert(Array.isArray(orders.body?.data), 'admin orders payload is invalid');
+  const externalRefunds = await client.json('/api/admin/refund-reconciliation?page=1&limit=1');
+  assert(externalRefunds.response.status === 200 && Array.isArray(externalRefunds.body?.data), 'admin external refund queue is invalid');
+  assert(externalRefunds.body?.page === 1 && externalRefunds.body?.limit === 1 && Number.isInteger(externalRefunds.body?.total) && typeof externalRefunds.body?.hasMore === 'boolean', 'external refund queue pagination metadata is invalid');
+  const invalidExternalPage = await client.json('/api/admin/refund-reconciliation?page=0');
+  assert(invalidExternalPage.response.status === 422, 'external refund queue accepted an invalid page');
   assert(orders.body?.page === 1 && orders.body?.limit <= 100, 'admin order pagination metadata is invalid');
   assert(typeof orders.body?.hasMore === 'boolean' && Number.isInteger(orders.body?.total), 'admin order pagination is missing its total/continuation fields');
   const disputes = await client.json('/api/admin/payment-disputes?page=1&limit=1');

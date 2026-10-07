@@ -20,7 +20,8 @@ trait RefundAdminResultActions
             $refund,
             $order,
             (int) $order['payment_refund_attempt'],
-            $expectedRefundCents
+            $expectedRefundCents,
+            $order['payment_refund_id']
         );
         $refundId = (string) ($refund['id'] ?? '');
         $status = (string) ($refund['status'] ?? '');

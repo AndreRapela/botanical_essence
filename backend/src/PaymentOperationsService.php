@@ -17,7 +17,8 @@ final class PaymentOperationsService
         private readonly Closure $applyRefundEvent,
         private readonly ?Closure $listRefundsForPaymentIntent = null,
         private readonly ?Closure $retrieveCheckoutSession = null,
-        private readonly ?Closure $retrievePaymentIntent = null
+        private readonly ?Closure $retrievePaymentIntent = null,
+        private readonly ?Closure $recoverExternalRefunds = null
     ) {
         $this->checkoutReconciliation = new CheckoutReconciliationService(
             $this->pdo,
@@ -36,9 +37,10 @@ final class PaymentOperationsService
         $reconciled = $this->checkoutReconciliation->reconcilePendingSessions($limit);
         $confirmations = $this->recoverMissingPaymentConfirmations($limit);
         $refunds = $this->reconcilePendingRefunds($limit);
+        $externalRefunds = $this->recoverExternalRefunds === null ? 0 : ($this->recoverExternalRefunds)($limit);
         $mail = $this->deliverConfirmationEmails($limit);
         $disputes = $this->syncDisputes($limit);
-        return ['sessions' => $reconciled, 'confirmations' => $confirmations, 'refunds' => $refunds, 'emails' => $mail, 'disputes' => $disputes];
+        return ['sessions' => $reconciled, 'confirmations' => $confirmations, 'refunds' => $refunds, 'externalRefunds' => $externalRefunds, 'emails' => $mail, 'disputes' => $disputes];
     }
 
     public function dispatchOutbox(int $limit = 20): int
@@ -268,14 +270,14 @@ final class PaymentOperationsService
     private function refundMatchesPendingAttempt(array $refund, array $order): bool
     {
         $metadata = $refund['metadata'] ?? null;
-        if (!is_array($metadata)) return false;
         $paymentIntent = $refund['payment_intent'] ?? null;
         $paymentIntentId = is_array($paymentIntent)
             ? (string) ($paymentIntent['id'] ?? '')
             : (string) $paymentIntent;
         if ($paymentIntentId === '' || !hash_equals((string) $order['payment_intent_id'], $paymentIntentId)
-            || (string) ($metadata['order_number'] ?? '') !== (string) $order['order_number']
-            || (int) ($metadata['refund_attempt'] ?? 0) !== (int) $order['payment_refund_attempt']) {
+            || (((string) ($order['payment_refund_id'] ?? '') === '' || ($refund['id'] ?? null) !== $order['payment_refund_id'])
+                && (!is_array($metadata) || (string) ($metadata['order_number'] ?? '') !== (string) $order['order_number']
+                    || (int) ($metadata['refund_attempt'] ?? 0) !== (int) $order['payment_refund_attempt']))) {
             return false;
         }
         if (!PaymentPolicy::stripeObjectMatchesOrder($refund, $order)) {
@@ -368,11 +370,20 @@ final class PaymentOperationsService
                         . 'Your bank or payment provider may take additional time to display the funds.';
                     $subject = "Refund confirmed · {$message['order_number']}";
                 } elseif ($message['notificationType'] === 'full_refund_confirmation') {
+                    $state = $this->pdo->prepare("SELECT 1 FROM orders WHERE id = :id AND payment_status = 'refunded'
+                        AND payment_refunded_cents = ROUND(total * 100)");
+                    $state->execute([':id' => $message['orderId']]);
+                    if (!$state->fetchColumn()) throw new RuntimeException('Full refund confirmation is no longer current; support must review the provider reversal.');
                     $total = number_format((float) $message['total'], 2, '.', '');
                     $body = "A full refund of {$symbol}{$total} {$currency} for order {$message['order_number']} has been confirmed.\n\n"
                         . "Reference: {$message['referenceId']}\n\n"
                         . 'Your bank or payment provider may take additional time to display the funds.';
                     $subject = "Refund confirmed · {$message['order_number']}";
+                } elseif ($message['notificationType'] === 'refund_reversal_notice') {
+                    $subject = "Refund status changed · {$message['order_number']}";
+                    $body = "The payment provider returned a refund or requested corrected recipient information for order {$message['order_number']}.\n\n"
+                        . "Reference: {$message['referenceId']}\n\n"
+                        . 'Our support team must reconfirm the refund route. This accounting review does not charge you again. Contact support for the latest status.';
                 } else {
                     $itemsQuery = $this->pdo->prepare('SELECT product_name, quantity FROM order_items WHERE order_id = :orderId ORDER BY id');
                     $itemsQuery->execute([':orderId' => $message['orderId']]);

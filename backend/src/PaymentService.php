@@ -15,6 +15,7 @@ final class PaymentService
     private readonly WithdrawalService $withdrawals;
     private readonly PaymentOperationsService $operations;
     private readonly UnattachedCheckoutResolver $unattachedCheckoutResolver;
+    private readonly ExternalRefundService $externalRefunds;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -46,6 +47,8 @@ final class PaymentService
             fn (array $session, bool $paid): mixed => $this->applyCheckoutEvent($session, $paid),
             fn (int $orderId, string $status): mixed => $this->cancelUnpaidOrder($orderId, $status)
         );
+        $this->externalRefunds = new ExternalRefundService($pdo, $this->stripe, $limiter, $this->orderLock,
+            fn (array $refund): mixed => $this->applyRefundEvent($refund));
         $this->operations = new PaymentOperationsService(
             $pdo,
             $this->stripe,
@@ -53,7 +56,8 @@ final class PaymentService
             $mailer ?? new Mailer(),
             fn (array $session, bool $paid): mixed => $this->applyCheckoutEvent($session, $paid),
             fn (int $orderId, string $status): mixed => $this->cancelUnpaidOrder($orderId, $status),
-            fn (array $refund): mixed => $this->applyRefundEvent($refund)
+            fn (array $refund): mixed => $this->applyRefundEvent($refund),
+            recoverExternalRefunds: fn (int $limit): int => $this->externalRefunds->recover($limit)
         );
     }
 
@@ -89,6 +93,16 @@ final class PaymentService
         return $this->operations->adminDisputes($query);
     }
 
+    public function externalRefundIssues(array $query = []): array
+    {
+        return $this->externalRefunds->issues($query);
+    }
+
+    public function resolveExternalRefund(array $input, array $admin): array
+    {
+        return $this->externalRefunds->resolve($input, $admin);
+    }
+
 
 
     public function adminOrders(array $query = []): array
@@ -117,6 +131,8 @@ final class PaymentService
                     o.payment_refund_error_code AS refundErrorCode,
                     o.payment_refund_error_message AS refundErrorMessage,
                     o.payment_refund_error_http_status AS refundErrorHttpStatus,
+                    o.payment_refunds_scan_error AS refundScanError,
+                    EXISTS(SELECT 1 FROM payment_external_refunds er WHERE er.order_id = o.id AND er.resolution = 'unmatched') AS externalRefundUnmatched,
                     o.payment_refunded_cents AS refundedTotalCents,
                     EXISTS(SELECT 1 FROM payment_refund_attempts pra
                            WHERE pra.order_id = o.id AND pra.attempt = o.payment_refund_attempt AND pra.attempt_kind = 'partial') AS refundAttemptIsPartial,
@@ -137,6 +153,7 @@ final class PaymentService
             $order['testPayment'] = (bool) $order['testPayment'];
             $order['paymentSessionUnconfirmed'] = (bool) $order['paymentSessionUnconfirmed'];
             $order['paymentReconciliationRequired'] = (bool) $order['paymentReconciliationRequired'];
+            $order['externalRefundUnmatched'] = (bool) $order['externalRefundUnmatched'];
             $order['refundAttempt'] = (int) $order['refundAttempt'];
             $order['refundedTotalCents'] = (int) $order['refundedTotalCents'];
             $order['refundAttemptIsPartial'] = (bool) $order['refundAttemptIsPartial'];

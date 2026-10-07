@@ -80,6 +80,7 @@
                 "src/app/seller-studio.component.ts",
                 "src/app/order.view.ts",
                 "src/app/admin-payment-notifications.component.ts",
+                "src/app/admin-refund-reconciliation.component.ts",
               "src/app/admin-refund-interaction.ts",
               "src/app/checkout-payment-methods.component.ts",
               "src/app/product-card.component.ts",

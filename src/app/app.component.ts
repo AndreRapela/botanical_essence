@@ -24,6 +24,7 @@ import { AdminFinancialOperationsComponent } from './admin-financial-operations.
 import { AdminCatalogManagementComponent } from './admin-catalog-management.component';
 import type { AdminProductForm, AdminStoreForm, AdminUserForm } from './admin-catalog-management.component';
 import { AdminPaymentNotificationsComponent } from './admin-payment-notifications.component';
+import { AdminRefundReconciliationComponent } from './admin-refund-reconciliation.component';
 import { AuthFormComponent } from './auth-form.component';
 import { ProductCardComponent } from './product-card.component';
 import { InformationPagesComponent } from './information-pages.component';
@@ -200,7 +201,7 @@ import {
 @Component({
   selector: 'app-storefront',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminContactInboxComponent, AdminAuditLogComponent, AdminDisputesComponent, AdminFinancialOperationsComponent, AdminCatalogManagementComponent, AdminPaymentNotificationsComponent, AuthFormComponent, ProductCardComponent, InformationPagesComponent, CheckoutDetailsFormComponent, CheckoutDeliveryComponent, CheckoutFinalReviewComponent, CheckoutOrderSummaryComponent, CheckoutPendingComponent, AccountOrderHistoryComponent, SellerStudioComponent],
+  imports: [CommonModule, FormsModule, AdminContactInboxComponent, AdminAuditLogComponent, AdminDisputesComponent, AdminFinancialOperationsComponent, AdminCatalogManagementComponent, AdminPaymentNotificationsComponent, AdminRefundReconciliationComponent, AuthFormComponent, ProductCardComponent, InformationPagesComponent, CheckoutDetailsFormComponent, CheckoutDeliveryComponent, CheckoutFinalReviewComponent, CheckoutOrderSummaryComponent, CheckoutPendingComponent, AccountOrderHistoryComponent, SellerStudioComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush

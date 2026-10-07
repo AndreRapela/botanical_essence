@@ -34,6 +34,7 @@ require_once $source . '/RefundAdminActions.php';
 require_once $source . '/WithdrawalPolicy.php';
 require_once $source . '/WithdrawalService.php';
 require_once $source . '/PaymentOperationsService.php';
+require_once $source . '/ExternalRefundService.php';
 require_once $source . '/DisputeBackfillService.php';
 require_once $source . '/UnattachedCheckoutResolver.php';
 require_once $source . '/PartialRefundFailureActions.php';
@@ -196,6 +197,11 @@ try {
         $auth->requireRole('admin');
         return $payments->adminDisputes($_GET);
     });
+    $router->add('GET', '/api/admin/refund-reconciliation', static function () use ($payments, $auth): array {
+        $auth->requireRole('admin');
+        return $payments->externalRefundIssues($_GET);
+    });
+    $router->add('POST', '/api/admin/refund-reconciliation/resolve', static fn (): array => $payments->resolveExternalRefund(Request::json(), $auth->requireRole('admin')));
     $router->add('GET', '/api/admin/payment-notifications', static function () use ($adminPaymentNotifications, $auth): array {
         $auth->requireRole('admin');
         return $adminPaymentNotifications->issues($_GET);

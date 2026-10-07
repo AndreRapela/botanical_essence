@@ -182,6 +182,8 @@ trait PartialRefundActions
             throw new HttpException('O pedido não está em um estado que permita reembolso parcial.', 409);
         }
 
+        $this->verifyProviderRefundLedger($order);
+
         $this->pdo->beginTransaction();
         try {
             $returnRequest = null;
@@ -201,6 +203,7 @@ trait PartialRefundActions
             );
             $select->execute([':id' => $order['id']]);
             $current = $select->fetch();
+            ExternalRefundService::assertReconciled($this->pdo, (int) $order['id']);
             if ($withdrawalRequestId === null) {
                 $activeReturn = $this->pdo->prepare(
                     "SELECT id FROM withdrawal_requests
@@ -323,6 +326,9 @@ trait PartialRefundActions
         $paymentIntentId = is_array($paymentIntent) ? (string) ($paymentIntent['id'] ?? '') : (string) $paymentIntent;
         $refundId = (string) ($refund['id'] ?? '');
         if ($paymentIntentId === '' || $refundId === '') return false;
+        $boundKind = $this->pdo->prepare('SELECT attempt_kind FROM payment_refund_attempts WHERE stripe_refund_id = :id LIMIT 1');
+        $boundKind->execute([':id' => $refundId]);
+        if ($boundKind->fetchColumn() === 'full') return false;
         $attempt = isset($refund['metadata']['refund_attempt']) ? (int) $refund['metadata']['refund_attempt'] : 0;
         $find = $this->pdo->prepare(
             "SELECT r.*, o.order_number, o.payment_intent_id, o.payment_status, o.payment_provider,
@@ -330,9 +336,9 @@ trait PartialRefundActions
              FROM payment_refund_attempts r INNER JOIN orders o ON o.id = r.order_id
              WHERE r.attempt_kind = 'partial' AND o.payment_intent_id = :paymentIntent AND (
                     (:attemptFilter > 0 AND r.attempt = :attemptMatch) OR r.stripe_refund_id = :refundId
-             ) LIMIT 1 FOR UPDATE"
+             ) ORDER BY (r.stripe_refund_id = :refundPriority) DESC LIMIT 1 FOR UPDATE"
         );
-        $find->execute([':paymentIntent' => $paymentIntentId, ':attemptFilter' => $attempt, ':attemptMatch' => $attempt, ':refundId' => $refundId]);
+        $find->execute([':paymentIntent' => $paymentIntentId, ':attemptFilter' => $attempt, ':attemptMatch' => $attempt, ':refundId' => $refundId, ':refundPriority' => $refundId]);
         $row = $find->fetch();
         if (!$row) return false;
         $order = [
@@ -342,7 +348,7 @@ trait PartialRefundActions
             'test_payment' => $row['test_payment'],
             'currency' => $row['currency'],
         ];
-        PaymentPolicy::assertStripeRefundMatchesAttempt($refund, $order, (int) $row['attempt'], (int) $row['amount_cents']);
+        PaymentPolicy::assertStripeRefundMatchesAttempt($refund, $order, (int) $row['attempt'], (int) $row['amount_cents'], $row['stripe_refund_id']);
         $this->savePartialRefundProviderState($row, $refund, null);
         return true;
     }
@@ -365,7 +371,8 @@ trait PartialRefundActions
             $refund,
             $order,
             (int) $row['attempt'],
-            (int) $row['amount_cents']
+            (int) $row['amount_cents'],
+            $row['stripe_refund_id']
         );
         $this->savePartialRefundProviderState($row, $refund, $adminId);
         return match ((string) ($refund['status'] ?? '')) {
@@ -402,11 +409,17 @@ trait PartialRefundActions
                 && !hash_equals((string) $currentAttempt['stripe_refund_id'], $refundId)) {
                 throw new HttpException('A Stripe vinculou mais de um reembolso à mesma tentativa parcial.', 409, [], 'stripe_refund_attempt_mismatch');
             }
+            if (ExternalRefundService::shouldDeferReviewedSuccess($this->pdo, $refund)) {
+                if ($ownsTransaction) $this->pdo->commit();
+                return;
+            }
             if ($currentAttempt['status'] === 'succeeded') {
+                if (in_array($status, ['failed', 'canceled', 'requires_action'], true)) $this->captureUnmatchedRefund($refund);
                 if ($ownsTransaction) $this->pdo->commit();
                 return;
             }
             if ($currentAttempt['status'] === 'manual' && $status !== 'succeeded') {
+                if ($currentAttempt['provider_error_code'] === 'manual_refunded' && in_array($status, ['failed', 'canceled', 'requires_action'], true)) $this->captureUnmatchedRefund($refund);
                 // Manual decisions are terminal for stale pending/failure events. In particular,
                 // do not let an out-of-order event undo the operator's decision or retry forever.
                 $save = $this->pdo->prepare(
@@ -420,6 +433,10 @@ trait PartialRefundActions
                     ':attempt' => $attempt,
                 ]);
                 error_log('Ignoring stale Stripe refund status ' . $status . ' after manual resolution for order ' . $currentOrder['order_number'] . ', attempt ' . $attempt . '.');
+                if ($ownsTransaction) $this->pdo->commit();
+                return;
+            }
+            if (RefundStatePolicy::isRepeatedFailure($currentAttempt, $refund, 'refund_failed')) {
                 if ($ownsTransaction) $this->pdo->commit();
                 return;
             }
@@ -441,6 +458,9 @@ trait PartialRefundActions
             if (in_array($status, ['pending', 'requires_action'], true)) {
                 $save = $this->pdo->prepare("UPDATE payment_refund_attempts SET stripe_refund_id = :refundId, status = 'pending', provider_error_code = NULL, provider_error_message = NULL WHERE order_id = :orderId AND attempt = :attempt");
                 $save->execute([':refundId' => $refundId !== '' ? $refundId : null, ':orderId' => $orderId, ':attempt' => $attempt]);
+                $this->pdo->prepare("UPDATE orders SET payment_refund_id = :refundId, payment_refund_outcome = 'pending'
+                    WHERE id = :id AND payment_refund_attempt = :attempt AND payment_status = 'refund_pending'")
+                    ->execute([':refundId' => $refundId, ':id' => $orderId, ':attempt' => $attempt]);
                 if ($ownsTransaction) $this->pdo->commit();
                 return;
             }

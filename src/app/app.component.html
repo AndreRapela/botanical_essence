@@ -498,6 +498,7 @@
         <app-admin-contact-inbox [messages]="adminContactMessages" [language]="currentLanguage" [loading]="adminLoading"
           [hasMore]="adminContactMessagesHasMore" [total]="adminContactMessagesTotal" (loadMore)="loadOlderAdminContactMessages()" (changeStatus)="updateAdminContactMessage($event.message, $event.status)" />
         <app-admin-audit-log [entries]="adminAuditEntries" [language]="currentLanguage" [loading]="adminLoading" [hasMore]="adminAuditHasMore" [total]="adminAuditTotal" (loadMore)="loadOlderAdminAuditLog()" />
+        <app-admin-refund-reconciliation [language]="currentLanguage" (changed)="loadAdminSellers()" />
         <app-admin-financial-operations
           [withdrawals]="adminWithdrawals" [withdrawalsTotal]="adminWithdrawalsTotal" [withdrawalsHasMore]="adminWithdrawalsHasMore"
           [orders]="adminOrders" [ordersTotal]="adminOrdersTotal" [ordersHasMore]="adminOrdersHasMore"

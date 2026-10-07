@@ -115,6 +115,8 @@ export interface AdminWithdrawalRequest {
 }
 
 export interface AdminOrder {
+  externalRefundUnmatched?: boolean;
+  refundScanError?: string | null;
   id: number;
   number: string;
   customerName: string;
@@ -141,6 +143,20 @@ export interface AdminOrder {
   currency: Currency;
   createdAt: string;
   items: { name: string; quantity: number }[];
+}
+
+export interface ExternalRefundIssue {
+  refundId: string;
+  orderId: number | null;
+  orderNumber: string | null;
+  paymentIntentId: string | null;
+  amountCents: number;
+  currency: string;
+  providerStatus: string;
+  resolution: 'unmatched' | 'linked' | 'external' | 'irrelevant' | 'reversed';
+  createdAt: string;
+  lastSyncedAt: string;
+  attempts: { attempt: number; kind: 'full' | 'partial'; amountCents: number; currency: string; status: string; refundId: string | null; alreadyCounted: boolean }[];
 }
 
 export interface AdminPaymentDispute {

@@ -21,4 +21,14 @@ final class RefundStatePolicy
         return $attemptStatus === 'succeeded'
             || ($attemptStatus === 'manual' && $manualResolution === 'manual_refunded');
     }
+
+    /** A history replay is not a new financial transition or a new failure audit. */
+    public static function isRepeatedFailure(array $attempt, array $refund, string $defaultCode): bool
+    {
+        $status = $refund['status'] ?? '';
+        return $attempt['status'] === 'failed' && $attempt['stripe_refund_id'] === ($refund['id'] ?? null)
+            && in_array($status, ['failed', 'canceled'], true)
+            && $attempt['provider_error_code'] === substr((string) ($refund['failure_reason'] ?? $defaultCode), 0, 100)
+            && $attempt['provider_error_message'] === 'Stripe refund status: ' . $status;
+    }
 }
