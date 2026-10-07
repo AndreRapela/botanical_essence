@@ -128,7 +128,7 @@ services:
           if [ "$$APP_ENV" = staging ] || [ "$$APP_ENV" = production ]; then
             [ "$${#root_pw}" -ge 32 ] && [ "$${#app_pw}" -ge 32 ] || exit 1;
           fi;
-          MYSQL_PWD="$$root_pw" mysql -h localhost -uroot --connect-timeout=3 --silent --skip-column-names -e 'SELECT 1' | grep -qx 1
+          MYSQL_PWD="$$root_pw" mysql --protocol=TCP -h 127.0.0.1 -uroot --connect-timeout=3 --silent --skip-column-names -e 'SELECT 1' | grep -qx 1
       interval: 5s
       timeout: 5s
       retries: 20

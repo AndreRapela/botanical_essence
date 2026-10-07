@@ -65,6 +65,13 @@ for (const file of dockerFiles) {
 }
 
 const compose = readFileSync(join(root, 'docker-compose.yml'), 'utf8');
+const ciWorkflow = readFileSync(join(root, '.github/workflows/quality.yml'), 'utf8');
+const credentialStep = ciWorkflow.indexOf('run: node scripts/ci-environment.mjs');
+const startupStep = ciWorkflow.indexOf('run: docker compose up');
+if (/^\s*DB_(?:ROOT_)?PASSWORD\s*:/m.test(ciWorkflow)
+  || credentialStep < 0 || startupStep < 0 || credentialStep > startupStep) {
+  findings.push('.github/workflows/quality.yml: generate masked disposable database credentials before starting Compose; never hard-code passwords');
+}
 for (const [index, line] of compose.split(/\r?\n/).entries()) {
   const match = line.match(/^\s*image:\s*([^\s#]+)/i);
   if (match && !/@sha256:[a-f0-9]{64}$/i.test(match[1])) {
@@ -74,6 +81,9 @@ for (const [index, line] of compose.split(/\r?\n/).entries()) {
 if (!/^  TRUSTED_PROXY_IPS: \$\{TRUSTED_PROXY_IPS:-\}$/m.test(compose)
   || !/^  TRUSTED_PROXY_HOSTS: \$\{TRUSTED_PROXY_HOSTS:-frontend\}$/m.test(compose)) {
   findings.push('docker-compose.yml: proxy trust must default to no CIDR ranges and the explicit frontend service only');
+}
+if (!compose.includes('mysql --protocol=TCP -h 127.0.0.1 -uroot --connect-timeout=3')) {
+  findings.push('docker-compose.yml: MySQL readiness must reject the temporary skip-networking bootstrap server');
 }
 
 for (const path of files.filter((path) => path.includes(`${join('src', 'app', 'core')}\\`) || path.includes('/src/app/core/'))) {

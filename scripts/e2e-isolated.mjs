@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { disposableDatabaseCredentials } from './ci-environment.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const composeFile = join(root, 'docker-compose.yml');
@@ -22,8 +23,9 @@ const resultsDir = join(tempDir, 'playwright-results');
 const storageDir = join(tempDir, 'storage');
 const database = `botanical_${suffix}_e2e`;
 const username = `botanical_${suffix}`;
-const databasePassword = randomBytes(32).toString('hex');
-const rootPassword = randomBytes(32).toString('hex');
+const databaseCredentials = disposableDatabaseCredentials();
+const databasePassword = databaseCredentials.DB_PASSWORD;
+const rootPassword = databaseCredentials.DB_ROOT_PASSWORD;
 
 let stackMayExist = false;
 let taskError = null;

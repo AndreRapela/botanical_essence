@@ -31,9 +31,8 @@ jobs:
       MAIL_TRANSPORT: log
       DB_DATABASE: botanical_essence_ci
       DB_USERNAME: botanical_ci
-      DB_PASSWORD: ci-only-not-a-secret
-      DB_ROOT_PASSWORD: ci-root-only-not-a-secret
       ALLOW_DISPOSABLE_DB_TESTS: "true"
+      RUN_DOCKER_CI_ENV_TEST: "true"
       STRIPE_SECRET_KEY: ""
       STRIPE_WEBHOOK_SECRET: ""
       STRIPE_ACCOUNT_ID: ""
@@ -58,6 +57,9 @@ jobs:
 
       - name: Install browsers for browser tests
         run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Generate disposable database credentials
+        run: node scripts/ci-environment.mjs
 
       - name: Start isolated application stack
         run: docker compose up -d --build --wait --wait-timeout 180
