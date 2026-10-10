@@ -99,7 +99,7 @@ final class FullRefundWebhookTestHarness
         return $this->resolveAdminRefund($order, $adminId, $resolution, $reason);
     }
 
-    public function performAdminRefundAttempt(array $order, string $paymentIntentId, int $attempt, int $adminId, ?int $withdrawalRequestId = null): array
+    public function performAdminRefundAttempt(array $order, string $paymentIntentId, int $attempt, int $adminId, int $amountCents, ?int $withdrawalRequestId = null): array
     {
         return ['attempt' => $attempt, 'paymentIntentId' => $paymentIntentId, 'message' => 'Stripe call intentionally stubbed in this test.'];
     }
@@ -2378,6 +2378,7 @@ $tests += require __DIR__ . '/refund-pagination-regressions.php';
 $tests += require __DIR__ . '/refund-identity-regressions.php';
 $tests += require __DIR__ . '/external-refund-regressions.php';
 $tests += require __DIR__ . '/late-refund-regressions.php';
+$tests += require __DIR__ . '/refund-balance-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

@@ -321,7 +321,7 @@ final class PaymentService
         }
         $cancelledRefundRetry = $order['status'] === 'cancelled'
             && $order['payment_provider'] === 'stripe'
-            && in_array($order['payment_status'], ['paid', 'refund_pending'], true);
+            && in_array($order['payment_status'], ['paid', 'partially_refunded', 'refund_pending'], true);
         if (in_array($order['status'], ['shipped', 'delivered'], true)
             || ($order['status'] === 'cancelled' && !$cancelledRefundRetry)) {
             throw new HttpException('Este pedido já foi enviado, entregue ou cancelado e não pode ser cancelado por aqui.', 409);
@@ -385,10 +385,7 @@ final class PaymentService
             }
             return $this->reconcileAdminRefund($order, (int) $admin['id']);
         }
-        if ($paymentStatus === 'partially_refunded') {
-            throw new HttpException('Este pedido já recebeu um reembolso parcial. Confira o saldo restante e processe qualquer valor adicional como reembolso parcial antes de cancelar.', 409, [], 'order_partially_refunded');
-        }
-        if ($paymentStatus === 'paid' && $order['payment_provider'] === 'stripe') {
+        if (in_array($paymentStatus, ['paid', 'partially_refunded'], true) && $order['payment_provider'] === 'stripe') {
             $paymentIntentId = (string) ($order['payment_intent_id'] ?? '');
             if ($paymentIntentId === '') {
                 throw new HttpException('O provedor ainda não confirmou a referência de reembolso. Tente novamente em instantes.', 409);

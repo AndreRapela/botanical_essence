@@ -124,4 +124,22 @@ describe('admin financial operations', () => {
     expect(fixture.nativeElement.textContent).toContain('EUR 20.00');
     expect(component.withdrawalStatusLabel('refund_pending')).toBe('Remboursement en cours de confirmation');
   });
+  it('offers remaining-balance cancellation and retry for a full attempt after a partial refund', () => {
+    const partial = { ...order, status: 'confirmed', paymentStatus: 'partially_refunded', refundAttempt: 2,
+      refundAttemptIsPartial: false, refundOutcome: 'definitive_failure' as const, refundedTotalCents: 5000 };
+    const cancelled: AdminOrder[] = [];
+    const actions: string[] = [];
+    component.orders = [partial];
+    component.cancelOrder.subscribe((value) => cancelled.push(value));
+    component.refundOrderAction.subscribe((value) => actions.push(value.action));
+    fixture.detectChanges();
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    buttons.find((button) => button.textContent?.includes('Cancel & refund balance'))?.click();
+    buttons.find((button) => button.textContent?.includes('Retry refund'))?.click();
+    expect(cancelled).toEqual([partial]); expect(actions).toEqual(['retry_refund']);
+    component.orders = [{ ...partial, externalRefundUnmatched: true }];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Cancel & refund balance');
+    expect(fixture.nativeElement.textContent).not.toContain('Retry refund');
+  });
 });

@@ -106,4 +106,28 @@ describe('admin refund interaction safeguards', () => {
     handleAdminRefundInteraction(makeOrder(), 'check_refund', undefined, copy, submit, showError, false);
     expect(submit).toHaveBeenCalledWith('check_refund');
   });
+
+  it('confirms only the remaining balance when cancelling a partly refunded order in EN and FR', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const order = makeOrder({ paymentStatus: 'partially_refunded', refundOutcome: 'succeeded', refundedTotalCents: 250 });
+    expect(confirmAdminOrderCancellation(order, copy)).toBe(true);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('only the remaining balance'));
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('previous refunds are preserved'));
+    expect(confirmAdminOrderCancellation(order, frenchCopy)).toBe(true);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('uniquement le solde restant'));
+  });
+
+  it('retries a full attempt after a partial credit only on a definite or audited non-refund', () => {
+    const submit = vi.fn();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const order = makeOrder({ paymentStatus: 'partially_refunded', refundOutcome: 'manual_not_refunded' });
+    handleAdminRefundInteraction(order, 'retry_refund', undefined, copy, submit, vi.fn(), false);
+    expect(submit).toHaveBeenCalledWith('retry_refund');
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('manually verified'));
+    handleAdminRefundInteraction(order, 'retry_refund', undefined, frenchCopy, submit, vi.fn(), false);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('vérifiée manuellement'));
+    submit.mockClear(); confirm.mockClear();
+    handleAdminRefundInteraction({ ...order, refundOutcome: 'unknown' }, 'retry_refund', undefined, copy, submit, vi.fn(), false);
+    expect(submit).not.toHaveBeenCalled(); expect(confirm).not.toHaveBeenCalled();
+  });
 });

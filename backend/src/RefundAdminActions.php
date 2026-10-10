@@ -23,16 +23,29 @@ trait RefundAdminActions
         if ($paymentIntentId === '') {
             throw new HttpException('O pagamento ainda não tem uma referência Stripe válida para reembolso.', 409);
         }
-        $refundAmountCents = $this->cents((string) $order['total']) - (int) ($order['payment_refunded_cents'] ?? 0);
-        if ($refundAmountCents < 1) {
-            throw new HttpException('Não há saldo pago disponível para um reembolso integral.', 409);
-        }
         $this->verifyProviderRefundLedger($order);
         $this->pdo->beginTransaction();
         try {
-            $lock = $this->pdo->prepare('SELECT id FROM orders WHERE id = :id FOR UPDATE');
+            $lock = $this->pdo->prepare('SELECT * FROM orders WHERE id = :id FOR UPDATE');
             $lock->execute([':id' => $order['id']]);
+            $current = $lock->fetch();
+            if (!$current || $current['payment_provider'] !== 'stripe'
+                || !in_array($current['payment_status'], ['paid', 'partially_refunded'], true)
+                || !in_array($current['payment_refund_outcome'], ['none','succeeded','definitive_failure','manual_refunded','manual_not_refunded'], true)
+                || (string) $current['payment_intent_id'] !== $paymentIntentId) {
+                throw new HttpException('O pagamento mudou ou possui uma tentativa pendente. Consulte o provedor antes de reenviar.', 409, [], 'refund_attempt_unresolved');
+            }
+            $order = $current;
+            $previousPayment = RefundStatePolicy::settledPaymentStatus((int) $current['payment_refunded_cents'], $this->cents((string) $current['total']));
+            $refundAmountCents = $this->cents((string) $current['total']) - (int) $current['payment_refunded_cents'];
+            if ($refundAmountCents < 1) throw new HttpException('Não há saldo pago disponível para um reembolso integral.', 409);
             ExternalRefundService::assertReconciled($this->pdo, (int) $order['id']);
+            if ($withdrawalRequestId === null) {
+                $activeReturn = $this->pdo->prepare("SELECT id FROM withdrawal_requests WHERE order_id = :id
+                    AND status IN ('submitted','reviewing','instructions_sent','return_received','refund_pending','refund_failed') LIMIT 1");
+                $activeReturn->execute([':id' => $order['id']]);
+                if ($activeReturn->fetchColumn()) throw new HttpException('Este pedido tem uma devolução aberta. Processe o reembolso pela fila de devoluções.', 409, [], 'withdrawal_request_active');
+            }
             if ($withdrawalRequestId !== null) {
                 $returnQuery = $this->pdo->prepare(
                     'SELECT order_id, status FROM withdrawal_requests WHERE id = :id LIMIT 1 FOR UPDATE'
@@ -52,8 +65,8 @@ trait RefundAdminActions
                         payment_refund_attempt = payment_refund_attempt + 1, payment_refund_id = NULL,
                         payment_refund_outcome = 'pending', payment_refund_error_code = NULL,
                         payment_refund_error_message = NULL, payment_refund_error_http_status = NULL
-                 WHERE id = :id AND payment_status = 'paid'
-                       AND payment_refund_outcome IN ('none','definitive_failure','manual_not_refunded')
+                 WHERE id = :id AND payment_status IN ('paid','partially_refunded')
+                       AND payment_refund_outcome IN ('none','succeeded','definitive_failure','manual_refunded','manual_not_refunded')
                        AND status IN {$orderStatuses}"
             );
             $claim->execute([':id' => $order['id']]);
@@ -67,7 +80,7 @@ trait RefundAdminActions
                 "INSERT INTO payment_refund_attempts
                     (order_id, attempt, attempt_kind, amount_cents, currency, previous_payment_status,
                      previous_order_status, withdrawal_request_id, status, reason, requested_by_admin_id)
-                 VALUES (:orderId, :attempt, 'full', :amount, :currency, 'paid',
+                 VALUES (:orderId, :attempt, 'full', :amount, :currency, :previousPayment,
                          :previousOrder, :withdrawalRequestId, 'pending', :reason, :adminId)"
             );
             $ledger->execute([
@@ -75,6 +88,7 @@ trait RefundAdminActions
                 ':attempt' => $attempt,
                 ':amount' => $refundAmountCents,
                 ':currency' => $order['currency'],
+                ':previousPayment' => $previousPayment,
                 ':previousOrder' => $order['status'],
                 ':withdrawalRequestId' => $withdrawalRequestId,
                 ':reason' => $withdrawalRequestId === null ? 'Admin full refund' : 'Customer withdrawal refund',
@@ -88,7 +102,7 @@ trait RefundAdminActions
             $audit->execute([
                 ':adminId' => $adminId,
                 ':orderId' => $order['id'],
-                ':previous' => $order['status'] . ':paid:' . $order['payment_refund_outcome'],
+                ':previous' => $order['status'] . ':' . $order['payment_status'] . ':' . $order['payment_refund_outcome'],
                 ':new' => $order['status'] . ':refund_pending:attempt=' . $attempt,
             ]);
             if ($withdrawalRequestId !== null) {
@@ -113,13 +127,13 @@ trait RefundAdminActions
             || $claimedOrder['payment_status'] !== 'refund_pending') {
             throw new HttpException('A tentativa de reembolso não pôde ser confirmada após a reserva do estado.', 409);
         }
-        return $this->performAdminRefundAttempt($claimedOrder, $paymentIntentId, $attempt, $adminId, $withdrawalRequestId);
+        return $this->performAdminRefundAttempt($claimedOrder, $paymentIntentId, $attempt, $adminId, $refundAmountCents, $withdrawalRequestId);
     }
 
-    private function performAdminRefundAttempt(array $order, string $paymentIntentId, int $attempt, int $adminId, ?int $withdrawalRequestId = null): array
+    private function performAdminRefundAttempt(array $order, string $paymentIntentId, int $attempt, int $adminId, int $amountCents, ?int $withdrawalRequestId = null): array
     {
         try {
-            $refund = $this->stripe->refundPaymentIntent($paymentIntentId, (string) $order['order_number'], $attempt);
+            $refund = $this->stripe->refundPaymentIntent($paymentIntentId, (string) $order['order_number'], $attempt, $amountCents);
             return $this->applyAdminRefundResult($order, $refund, $adminId, $withdrawalRequestId);
         } catch (StripeApiException $exception) {
             if ($exception->definitive) {
@@ -177,7 +191,7 @@ trait RefundAdminActions
     private function reconcileAdminRefund(array $order, int $adminId, ?int $withdrawalRequestId = null): array
     {
         if ($order['payment_provider'] !== 'stripe'
-            || !in_array($order['payment_status'], ['refund_pending', 'paid'], true)
+            || !in_array($order['payment_status'], ['refund_pending', 'paid', 'partially_refunded'], true)
             || (int) $order['payment_refund_attempt'] < 1
             || (string) ($order['payment_intent_id'] ?? '') === '') {
             throw new HttpException('Não há uma tentativa Stripe de reembolso para consultar neste pedido.', 409);
@@ -258,25 +272,57 @@ trait RefundAdminActions
         ?int $adminId
     ): void {
         $errorCode = $this->boundedProviderCode($errorCode);
-        $update = $this->pdo->prepare(
-            "UPDATE orders SET payment_status = 'paid', payment_refund_outcome = 'definitive_failure',
-                    payment_refund_id = COALESCE(:refundId, payment_refund_id),
-                    payment_refund_error_code = :errorCode, payment_refund_error_message = :errorMessage,
-                    payment_refund_error_http_status = :httpStatus
-             WHERE id = :id AND payment_status = 'refund_pending'
-                   AND payment_intent_id = :paymentIntent AND payment_refund_attempt = :attempt"
-        );
-        $update->execute([
-            ':refundId' => $refundId,
-            ':errorCode' => $errorCode,
-            ':errorMessage' => $this->boundedDiagnostic($errorMessage),
-            ':httpStatus' => $httpStatus,
-            ':id' => $orderId,
-            ':paymentIntent' => $paymentIntentId,
-            ':attempt' => $attempt,
-        ]);
-        if ($update->rowCount() === 1) {
-            $this->auditRefundState($adminId, $orderId, 'order.refund_failed', 'refund_pending', 'paid:definitive_failure', $errorCode . ': ' . $errorMessage);
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) $this->pdo->beginTransaction();
+        try {
+            $lock = $this->pdo->prepare('SELECT payment_status, payment_refund_attempt, payment_intent_id, payment_refunded_cents, total FROM orders WHERE id = :id FOR UPDATE');
+            $lock->execute([':id' => $orderId]);
+            $current = $lock->fetch();
+            $ledgerLock = $this->pdo->prepare('SELECT status, stripe_refund_id FROM payment_refund_attempts WHERE order_id = :id AND attempt = :attempt FOR UPDATE');
+            $ledgerLock->execute([':id' => $orderId, ':attempt' => $attempt]);
+            $ledger = $ledgerLock->fetch();
+            if (!$current || $current['payment_status'] !== 'refund_pending'
+                || (int) $current['payment_refund_attempt'] !== $attempt || $current['payment_intent_id'] !== $paymentIntentId
+                || ($ledger && !in_array($ledger['status'], ['pending', 'unknown', 'failed'], true))) {
+                if ($ownsTransaction) $this->pdo->commit();
+                return;
+            }
+            if ($ledger && $refundId !== null && $ledger['stripe_refund_id'] !== null && $ledger['stripe_refund_id'] !== $refundId) {
+                throw new HttpException('A referência do reembolso diverge da tentativa vinculada.', 409, [], 'stripe_refund_attempt_mismatch');
+            }
+            $settledStatus = RefundStatePolicy::settledPaymentStatus((int) $current['payment_refunded_cents'], $this->cents((string) $current['total']));
+            $update = $this->pdo->prepare(
+                "UPDATE orders SET payment_status = :settledStatus, payment_refund_outcome = 'definitive_failure',
+                        payment_refund_id = COALESCE(:refundId, payment_refund_id),
+                        payment_refund_error_code = :errorCode, payment_refund_error_message = :errorMessage,
+                        payment_refund_error_http_status = :httpStatus
+                 WHERE id = :id AND payment_status = 'refund_pending'
+                       AND payment_intent_id = :paymentIntent AND payment_refund_attempt = :attempt"
+            );
+            $update->execute([
+                ':settledStatus' => $settledStatus,
+                ':refundId' => $refundId,
+                ':errorCode' => $errorCode,
+                ':errorMessage' => $this->boundedDiagnostic($errorMessage),
+                ':httpStatus' => $httpStatus,
+                ':id' => $orderId,
+                ':paymentIntent' => $paymentIntentId,
+                ':attempt' => $attempt,
+            ]);
+            if ($update->rowCount() === 1) {
+                if ($ledger) {
+                    $saveLedger = $this->pdo->prepare("UPDATE payment_refund_attempts SET status = 'failed',
+                        stripe_refund_id = COALESCE(:refundId, stripe_refund_id), provider_error_code = :code,
+                        provider_error_message = :message WHERE order_id = :id AND attempt = :attempt");
+                    $saveLedger->execute([':refundId' => $refundId, ':code' => $errorCode,
+                        ':message' => $this->boundedDiagnostic($errorMessage), ':id' => $orderId, ':attempt' => $attempt]);
+                }
+                $this->auditRefundState($adminId, $orderId, 'order.refund_failed', 'refund_pending', $settledStatus . ':definitive_failure', $errorCode . ': ' . $errorMessage);
+            }
+            if ($ownsTransaction) $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
         }
     }
 
@@ -362,7 +408,7 @@ trait RefundAdminActions
     private function resolveAdminRefund(array $order, int $adminId, string $resolution, string $reason): array
     {
         if ($order['payment_provider'] !== 'stripe'
-            || !in_array($order['payment_status'], ['refund_pending', 'paid'], true)
+            || !in_array($order['payment_status'], ['refund_pending', 'paid', 'partially_refunded'], true)
             || (int) $order['payment_refund_attempt'] < 1
             || !in_array($order['status'], ['confirmed', 'preparing', 'cancelled'], true)) {
             throw new HttpException('A resolução manual só pode ser registrada para uma tentativa Stripe de reembolso ainda não finalizada.', 409);
@@ -373,7 +419,7 @@ trait RefundAdminActions
             $select = $this->pdo->prepare('SELECT status, payment_status, payment_refund_outcome, payment_refund_attempt, payment_refunded_cents, total, currency FROM orders WHERE id = :id FOR UPDATE');
             $select->execute([':id' => $order['id']]);
             $current = $select->fetch();
-            if (!$current || !in_array($current['payment_status'], ['refund_pending', 'paid'], true)
+            if (!$current || !in_array($current['payment_status'], ['refund_pending', 'paid', 'partially_refunded'], true)
                 || (int) $current['payment_refund_attempt'] !== (int) $order['payment_refund_attempt']
                 || !in_array($current['status'], ['confirmed', 'preparing', 'cancelled'], true)) {
                 throw new HttpException('O pedido mudou durante a resolução. Atualize a lista e confira novamente.', 409);
@@ -438,7 +484,7 @@ trait RefundAdminActions
             if ($recordResolution->rowCount() !== 1) {
                 throw new HttpException('A tentativa mudou durante a resolução manual.', 409);
             }
-            $newPaymentStatus = $resolution === 'refunded' ? 'refunded' : 'paid';
+            $newPaymentStatus = RefundStatePolicy::settledPaymentStatus($refundedCents, $this->cents((string) $current['total']));
             $outcome = $resolution === 'refunded' ? 'manual_refunded' : 'manual_not_refunded';
             $newStatus = $resolution === 'refunded' ? 'cancelled' : $current['status'];
             $update = $this->pdo->prepare(

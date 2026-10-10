@@ -134,6 +134,40 @@ test('seller demo account opens the protected seller workspace', async ({ page }
   await expect(page.locator('main:visible').first()).toContainText(/store|boutique|product|produit/i);
 });
 
+test('administrator confirms only the remaining balance of a partly refunded order on mobile', async ({ page }) => {
+  let cancelled = false;
+  const order = { id: 1, number: 'PREVIEW-BALANCE', customerName: 'Preview buyer', email: 'buyer@example.test',
+    status: 'confirmed', paymentStatus: 'partially_refunded', paymentProvider: 'stripe', paymentMethod: 'card',
+    testPayment: false, refundAttempt: 1, refundAttemptIsPartial: true, refundOutcome: 'succeeded',
+    refundedTotalCents: 2500, refundAttemptAmountCents: 2500, externalRefundUnmatched: false,
+    paymentSessionUnconfirmed: false, paymentReconciliationRequired: false,
+    subtotal: 100, shipping: 0, total: 100, currency: 'EUR', createdAt: '2026-10-10T10:00:00Z', items: [] };
+  await page.route('**/api/admin/orders?*', (route) => route.fulfill({ json: {
+    data: [{ ...order, ...(cancelled ? { status: 'cancelled', paymentStatus: 'refunded', refundedTotalCents: 10000 } : {}) }],
+    page: 1, limit: 50, total: 1, hasMore: false
+  } }));
+  await page.route('**/api/admin/orders/cancel', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().postDataJSON()).toEqual({ orderNumber: 'PREVIEW-BALANCE', action: 'cancel' });
+    cancelled = true;
+    await route.fulfill({ json: { message: 'Remaining balance refunded in this UI fixture; no provider request was sent.' } });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAs(page, /enter as administrator|entrer comme administrateur/i);
+  const row = page.locator('.admin-order-row').filter({ hasText: 'PREVIEW-BALANCE' });
+  const button = row.getByRole('button', { name: /cancel & refund balance|annuler et rembourser le solde/i });
+  await expect(button).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  const audit = await new AxeBuilder({ page }).include('app-admin-financial-operations').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(audit.violations).toEqual([]);
+  const confirmations = [];
+  page.once('dialog', async (dialog) => { confirmations.push(dialog.message()); await dialog.accept(); });
+  await button.click();
+  await expect(row).toContainText(/cancelled|annulée/i);
+  expect(confirmations.join(' ')).toMatch(/remaining balance|solde restant/i);
+  expect(cancelled).toBe(true);
+});
+
 test('administrator reviews an external refund in an accessible mobile form without sending another refund', async ({ page }, testInfo) => {
   let reviewed = false;
   const issue = { refundId: 're_preview1', orderId: 1, orderNumber: 'PREVIEW-REFUND', paymentIntentId: 'pi_preview1',

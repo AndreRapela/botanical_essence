@@ -6,8 +6,17 @@ final class RefundStatePolicy
 {
     public static function canStartNewAttempt(string $paymentStatus, string $outcome): bool
     {
-        return $paymentStatus === 'paid'
+        return in_array($paymentStatus, ['paid', 'partially_refunded'], true)
             && in_array($outcome, ['definitive_failure', 'manual_not_refunded'], true);
+    }
+
+    /** A terminal refund decision cannot erase amounts confirmed by other attempts. */
+    public static function settledPaymentStatus(int $refundedCents, int $totalCents): string
+    {
+        if ($totalCents < 1 || $refundedCents < 0 || $refundedCents > $totalCents) {
+            throw new HttpException('O saldo de reembolso exige conciliação antes desta ação.', 409, [], 'refund_balance_invalid');
+        }
+        return $refundedCents === $totalCents ? 'refunded' : ($refundedCents > 0 ? 'partially_refunded' : 'paid');
     }
 
     public static function isUnresolved(string $paymentStatus, string $outcome): bool

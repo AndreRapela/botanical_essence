@@ -11,10 +11,10 @@ export function confirmAdminOrderCancellation(order: AdminOrder, copy: Localize)
   const localSimulation = order.paymentProvider === 'local_test' && order.testPayment;
   const message = localSimulation
     ? copy('This is a local test purchase; cancelling it will not move any money. Continue?', 'Cet achat est une simulation locale ; son annulation ne déplacera aucun argent. Continuer ?')
-    : order.paymentStatus === 'paid'
+    : ['paid', 'partially_refunded'].includes(order.paymentStatus)
       ? order.testPayment
         ? copy('Stripe test mode will issue a test refund; no real money will move. Continue?', 'Le mode test de Stripe émettra un remboursement de test ; aucun argent réel ne sera transféré. Continuer ?')
-        : copy('Stripe will be asked to refund this purchase. The order is cancelled only after a successful refund; if Stripe is unavailable, it will remain protected for reconciliation.', 'Stripe sera sollicité pour rembourser cet achat. La commande ne sera annulée qu’après confirmation du remboursement ; si Stripe est indisponible, elle restera protégée pour réconciliation.')
+        : copy('Stripe will be asked to refund only the remaining balance of this purchase. Any previous refunds are preserved. The order is cancelled only after a successful refund; if Stripe is unavailable, it will remain protected for reconciliation.', 'Stripe sera sollicité pour rembourser uniquement le solde restant de cet achat. Les remboursements précédents sont conservés. La commande ne sera annulée qu’après confirmation du remboursement ; si Stripe est indisponible, elle restera protégée pour réconciliation.')
       : copy('Cancel this order and release its reserved stock?', 'Annuler cette commande et libérer le stock réservé ?');
   return window.confirm(message);
 }
@@ -34,11 +34,11 @@ export function handleAdminRefundInteraction(
     return;
   }
   if (action === 'retry_refund') {
-    if (order.paymentStatus !== 'paid' || !['definitive_failure', 'manual_not_refunded'].includes(order.refundOutcome)) return;
-    const confirmed = window.confirm(copy(
-      'Stripe definitively rejected the previous attempt. Start a new refund attempt? This will never be used while the result is unknown.',
-      'Stripe a définitivement refusé la tentative précédente. Lancer une nouvelle tentative de remboursement ? Cette option ne sera jamais utilisée si le résultat est inconnu.'
-    ));
+    if (!['paid', 'partially_refunded'].includes(order.paymentStatus) || !['definitive_failure', 'manual_not_refunded'].includes(order.refundOutcome)) return;
+    const message = order.refundOutcome === 'manual_not_refunded'
+      ? copy('The previous attempt was manually verified as not refunded. Start a new attempt against the remaining balance only?', 'La tentative précédente a été vérifiée manuellement comme non remboursée. Lancer une nouvelle tentative uniquement pour le solde restant ?')
+      : copy('Stripe definitively rejected the previous attempt. Start a new refund attempt? This will never be used while the result is unknown.', 'Stripe a définitivement refusé la tentative précédente. Lancer une nouvelle tentative de remboursement ? Cette option ne sera jamais utilisée si le résultat est inconnu.');
+    const confirmed = window.confirm(message);
     if (confirmed) submit(action);
     return;
   }

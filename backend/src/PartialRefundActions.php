@@ -69,22 +69,21 @@ trait PartialRefundActions
             );
             $lock->execute([':orderId' => $order['id'], ':attempt' => $attempt]);
             $refundAttempt = $lock->fetch();
-            $orderLock = $this->pdo->prepare('SELECT status, payment_status, payment_refunded_cents, total FROM orders WHERE id = :id LIMIT 1 FOR UPDATE');
+            $orderLock = $this->pdo->prepare('SELECT status, payment_status, payment_refund_attempt, payment_refunded_cents, total FROM orders WHERE id = :id LIMIT 1 FOR UPDATE');
             $orderLock->execute([':id' => $order['id']]);
             $current = $orderLock->fetch();
             if (!$refundAttempt || !$current || !in_array($refundAttempt['status'], ['pending', 'unknown'], true)
-                || $current['payment_status'] !== 'refund_pending') {
+                || $current['payment_status'] !== 'refund_pending' || (int) $current['payment_refund_attempt'] !== $attempt) {
                 throw new HttpException('A tentativa parcial não está em um estado incerto que possa ser resolvido manualmente.', 409);
             }
-            $newPaymentStatus = (string) $refundAttempt['previous_payment_status'];
             $newRefunded = (int) $current['payment_refunded_cents'];
             if ($resolution === 'refunded') {
                 $newRefunded += (int) $refundAttempt['amount_cents'];
                 if ($newRefunded > $this->cents((string) $current['total'])) {
                     throw new HttpException('O valor acumulado de reembolso ultrapassaria o total pago.', 409);
                 }
-                $newPaymentStatus = $newRefunded >= $this->cents((string) $current['total']) ? 'refunded' : 'partially_refunded';
             }
+            $newPaymentStatus = RefundStatePolicy::settledPaymentStatus($newRefunded, $this->cents((string) $current['total']));
             $ledger = $this->pdo->prepare(
                 'UPDATE payment_refund_attempts SET status = \'manual\', provider_error_code = :code,
                         provider_error_message = :reason WHERE order_id = :orderId AND attempt = :attempt'

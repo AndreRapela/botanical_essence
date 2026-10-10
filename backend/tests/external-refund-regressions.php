@@ -7,6 +7,7 @@ final class ExternalRefundIntegrationHarness
 {
     use PaymentWebhookActions;
     use RefundAdminActions;
+    use RefundAdminResultActions;
     use PartialRefundActions;
     public readonly ExternalRefundService $externalRefunds;
     private readonly LatePaymentRecoveryService $latePaymentRecovery;
@@ -22,7 +23,16 @@ final class ExternalRefundIntegrationHarness
     public function apply(array $refund): void { $this->applyRefundEvent($refund); }
     public function startPartial(): array { return $this->startPartialRefundAttempt($this->order(), 1000, 'Test provider preflight', 42); }
     public function startFull(): array { return $this->startAdminRefundAttempt($this->order(), 42); }
+    public function resolvePartial(string $resolution, ?array $selectedOrder = null): array { return $this->resolvePartialRefundAttempt($selectedOrder ?? $this->order(), 42, $resolution, 'Provider independently verified this manual decision'); }
+    public function resolveFull(string $resolution): array { return $this->resolveAdminRefund($this->order(), 42, $resolution, 'Provider independently verified this manual decision'); }
+    public function rejectFull(int $attempt): void { $this->recordDefinitiveRefundFailure(1, 'pi_external1', $attempt, null, 'amount_too_large', 'Provider rejected the exact amount', 400, 42); }
     public function order(): array { return $this->pdo->query('SELECT * FROM orders WHERE id = 1')->fetch(); }
+    private function orderForAdmin(string $number): ?array
+    {
+        $query = $this->pdo->prepare('SELECT * FROM orders WHERE order_number = :number');
+        $query->execute([':number' => $number]);
+        return $query->fetch() ?: null;
+    }
     private function cents(string $amount): int { return (int) round((float) $amount * 100); }
     protected function queueFullRefundConfirmation(int $id, string $reference): void
     {
