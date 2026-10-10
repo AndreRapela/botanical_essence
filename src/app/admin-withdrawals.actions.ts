@@ -7,6 +7,7 @@ import type { AuthService } from './core/auth.service';
 import type { CommerceService } from './core/commerce.service';
 import type { AdminWithdrawalRequest, Language, LocalizedText, OrderSummary } from './storefront.models';
 import { withdrawalStatusText } from './order.view';
+import { adminRefundResultMessage } from './admin-refund-interaction';
 
 export type AdminWithdrawalAction = 'review' | 'send_instructions' | 'mark_received' | 'not_eligible' | 'refund' | 'check_refund' | 'retry_refund';
 
@@ -114,10 +115,10 @@ export function runAdminWithdrawalAction(this: AdminWithdrawalsActionsContext, r
     this.commerce.adminWithdrawalAction({ requestId: request.id, action, ...(note ? { note } : {}) })
       .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.cdr.markForCheck()))
       .subscribe({
-        next: ({ message }) => {
+        next: (result) => {
           if (sessionVersion !== this.auth.sessionVersion) return;
           this.adminLoading = false;
-          this.adminSuccess = message;
+          this.adminSuccess = adminRefundResultMessage(result, (english, french) => this.copy(english, french));
           this.loadAdminSellers();
         },
         error: (error: HttpErrorResponse) => {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminOrder } from './storefront.models';
-import { confirmAdminOrderCancellation, handleAdminRefundInteraction } from './admin-refund-interaction';
+import { adminRefundResultMessage, confirmAdminOrderCancellation, handleAdminRefundInteraction } from './admin-refund-interaction';
 
 function makeOrder(values: Partial<AdminOrder> = {}): AdminOrder {
   return {
@@ -26,10 +26,48 @@ const frenchCopy = (_english: string, french: string): string => french;
 describe('admin refund interaction safeguards', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('does not offer cancellation for shipped, delivered or cancelled orders', () => {
+  it('localizes a settled refund balance in EN and FR without implying automatic fulfillment', () => {
+    const result = { code: 'refund_balance_confirmed', message: 'Mensagem bruta da API' };
+    expect(adminRefundResultMessage(result, copy)).toContain('refund balance is settled. Check fulfillment');
+    expect(adminRefundResultMessage(result, frenchCopy)).toContain('solde du remboursement est réglé. Vérifiez la livraison');
+  });
+
+  it('localizes a refund shortfall in EN and FR without authorizing another refund or stock change', () => {
+    const result = { code: 'refund_balance_remaining', message: 'Mensagem bruta da API' };
+    expect(adminRefundResultMessage(result, copy)).toContain('No additional refund was sent');
+    expect(adminRefundResultMessage(result, frenchCopy)).toContain('Aucun remboursement supplémentaire n’a été envoyé');
+  });
+
+  it('preserves legacy responses and unknown operation results without falsely confirming a refund', () => {
+    expect(adminRefundResultMessage({ message: 'Provider still processing' }, copy)).toBe('Provider still processing');
+    expect(adminRefundResultMessage({ message: 'Provider still processing', code: 'unrecognized' }, frenchCopy)).toBe('Provider still processing');
+  });
+
+  it('does not offer cancellation for shipped delivered or cancelled orders without a resolved Stripe balance', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     for (const status of ['shipped', 'delivered', 'cancelled'] as const) {
       expect(confirmAdminOrderCancellation(makeOrder({ status }), copy)).toBe(false);
+    }
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('confirms an already cancelled resolved Stripe balance in EN and FR without a second restock', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const order = makeOrder({ status: 'cancelled', paymentStatus: 'partially_refunded', refundOutcome: 'succeeded' });
+    expect(confirmAdminOrderCancellation(order, copy)).toBe(true);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('stock will not be restored again'));
+    expect(confirmAdminOrderCancellation(order, frenchCopy)).toBe(true);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('uniquement le solde restant'));
+    expect(confirmAdminOrderCancellation({ ...order, paymentStatus: 'paid', refundOutcome: 'none', refundAttempt: 0, testPayment: true }, copy)).toBe(true);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('Stripe test mode'));
+  });
+
+  it('never authorizes a cancelled unresolved external or non-Stripe refund balance', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const order = makeOrder({ status: 'cancelled', paymentStatus: 'partially_refunded', refundOutcome: 'succeeded' });
+    for (const values of [{ paymentStatus: 'refund_pending' }, { refundOutcome: 'unknown' as const },
+      { externalRefundUnmatched: true }, { paymentProvider: 'local_test' }, { paymentStatus: 'refunded' }]) {
+      expect(confirmAdminOrderCancellation({ ...order, ...values }, copy)).toBe(false);
     }
     expect(confirm).not.toHaveBeenCalled();
   });

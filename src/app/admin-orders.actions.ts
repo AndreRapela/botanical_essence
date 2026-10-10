@@ -3,7 +3,7 @@ import type { ChangeDetectorRef, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, forkJoin, takeUntil } from 'rxjs';
 
-import { confirmAdminOrderCancellation, handleAdminRefundInteraction } from './admin-refund-interaction';
+import { adminRefundResultMessage, confirmAdminOrderCancellation, handleAdminRefundInteraction } from './admin-refund-interaction';
 import type { AdminOrderAction, AdminRefundAction, RefundResolution } from './admin-refund-interaction';
 import type { CommerceService } from './core/commerce.service';
 import type { AuthService } from './core/auth.service';
@@ -259,10 +259,10 @@ export function runAdminOrderAction(this: AdminOrdersActionsContext, order: Admi
     this.adminError = '';
     this.adminSuccess = '';
     this.commerce.cancelAdminOrder(order.number, action, resolution, reason).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.cdr.markForCheck())).subscribe({
-      next: ({ message }) => {
+      next: (result) => {
         if (sessionVersion !== this.auth.sessionVersion) return;
         this.adminLoading = false;
-        this.adminSuccess = message;
+        this.adminSuccess = adminRefundResultMessage(result, (english, french) => this.copy(english, french));
         this.loadAdminSellers();
       },
       error: (error: HttpErrorResponse) => {

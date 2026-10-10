@@ -360,8 +360,11 @@ final class PaymentOperationsService
                 ], static fn ($value): bool => is_string($value) && trim($value) !== ''));
                 if ($message['notificationType'] === 'refund_confirmation') {
                     $refundQuery = $this->pdo->prepare(
-                        "SELECT amount_cents, reason FROM payment_refund_attempts
-                         WHERE order_id = :orderId AND attempt = :attempt AND status IN ('succeeded','manual') LIMIT 1"
+                        "SELECT r.amount_cents, r.reason FROM payment_refund_attempts r
+                         WHERE r.order_id = :orderId AND r.attempt = :attempt
+                            AND (r.status = 'succeeded' OR (r.status = 'manual' AND r.provider_error_code = 'manual_refunded'))
+                            AND NOT EXISTS(SELECT 1 FROM payment_external_refunds e WHERE e.stripe_refund_id = r.stripe_refund_id
+                                AND e.resolution = 'unmatched' AND e.provider_status IN ('failed','canceled','requires_action')) LIMIT 1"
                     );
                     $refundQuery->execute([':orderId' => $message['orderId'], ':attempt' => $message['referenceId']]);
                     $refund = $refundQuery->fetch();
@@ -373,7 +376,8 @@ final class PaymentOperationsService
                     $subject = "Refund confirmed · {$message['order_number']}";
                 } elseif ($message['notificationType'] === 'full_refund_confirmation') {
                     $state = $this->pdo->prepare("SELECT 1 FROM orders WHERE id = :id AND payment_status = 'refunded'
-                        AND payment_refunded_cents = ROUND(total * 100)");
+                        AND payment_refunded_cents = ROUND(total * 100)
+                        AND NOT EXISTS(SELECT 1 FROM payment_external_refunds e WHERE e.order_id = orders.id AND e.resolution = 'unmatched')");
                     $state->execute([':id' => $message['orderId']]);
                     if (!$state->fetchColumn()) throw new RuntimeException('Full refund confirmation is no longer current; support must review the provider reversal.');
                     $total = number_format((float) $message['total'], 2, '.', '');

@@ -161,7 +161,7 @@ export class CommerceService {
     return this.http.get<{ data: AdminWithdrawalRequest[]; page: number; limit: number; total: number; hasMore: boolean }>('/api/admin/withdrawals', { params: { page, limit } });
   }
 
-  adminWithdrawalAction(input: { requestId: number; action: string; note?: string }): Observable<{ message: string }> {
+  adminWithdrawalAction(input: { requestId: number; action: string; note?: string }): Observable<{ message: string; code?: string }> {
     return this.auth.postWithCsrf('/api/admin/withdrawals/action', input);
   }
 
@@ -170,8 +170,8 @@ export class CommerceService {
     action: 'cancel' | 'check_refund' | 'retry_refund' | 'resolve_refund' | 'resolve_checkout_attempt' = 'cancel',
     resolution?: 'refunded' | 'not_refunded',
     reason?: string
-  ): Observable<{ message: string }> {
-    return this.auth.postWithCsrf<{ message: string }>('/api/admin/orders/cancel', {
+  ): Observable<{ message: string; code?: string }> {
+    return this.auth.postWithCsrf<{ message: string; code?: string }>('/api/admin/orders/cancel', {
       orderNumber,
       action,
       ...(resolution ? { resolution } : {}),

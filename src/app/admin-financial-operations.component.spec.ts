@@ -142,4 +142,19 @@ describe('admin financial operations', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Cancel & refund balance');
     expect(fixture.nativeElement.textContent).not.toContain('Retry refund');
   });
+  it('offers a cancelled settled balance without permitting unknown or externally unreviewed refunds', () => {
+    const cancelled = { ...order, status: 'cancelled', paymentStatus: 'partially_refunded', refundAttempt: 2,
+      refundAttemptIsPartial: false, refundOutcome: 'succeeded' as const, refundedTotalCents: 500 };
+    component.orders = [cancelled];
+    const selected: AdminOrder[] = [];
+    component.cancelOrder.subscribe((value) => selected.push(value));
+    fixture.detectChanges();
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    buttons.find((button) => button.textContent?.includes('Refund remaining balance'))?.click();
+    expect(selected).toEqual([cancelled]);
+    for (const values of [{ refundOutcome: 'unknown' as const }, { externalRefundUnmatched: true }]) {
+      component.orders = [{ ...cancelled, ...values }]; fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).not.toContain('Refund remaining balance');
+    }
+  });
 });

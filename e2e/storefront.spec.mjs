@@ -168,6 +168,44 @@ test('administrator confirms only the remaining balance of a partly refunded ord
   expect(cancelled).toBe(true);
 });
 
+test('administrator can explicitly refund a cancelled order balance without cancelling its stock again', async ({ page }, testInfo) => {
+  let requested = false;
+  const order = { id: 1, number: 'PREVIEW-CANCELLED-BALANCE', customerName: 'Preview buyer', email: 'buyer@example.test',
+    status: 'cancelled', paymentStatus: 'partially_refunded', paymentProvider: 'stripe', paymentMethod: 'card',
+    testPayment: false, refundAttempt: 2, refundAttemptIsPartial: false, refundOutcome: 'succeeded',
+    refundedTotalCents: 7500, refundAttemptAmountCents: 7500, externalRefundUnmatched: false,
+    refundErrorCode: 'refund_balance_remaining', refundErrorMessage: 'Review the remaining balance before authorizing another refund.',
+    paymentSessionUnconfirmed: false, paymentReconciliationRequired: false,
+    subtotal: 100, shipping: 0, total: 100, currency: 'EUR', createdAt: '2026-10-10T10:00:00Z', items: [] };
+  await page.route('**/api/admin/orders?*', (route) => route.fulfill({ json: {
+    data: [{ ...order, ...(requested ? { paymentStatus: 'refunded', refundedTotalCents: 10000 } : {}) }],
+    page: 1, limit: 50, total: 1, hasMore: false
+  } }));
+  await page.route('**/api/admin/orders/cancel', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().postDataJSON()).toEqual({ orderNumber: 'PREVIEW-CANCELLED-BALANCE', action: 'cancel' });
+    requested = true;
+    await route.fulfill({ json: { code: 'refund_balance_confirmed', message: 'Mensagem bruta da API, apenas fixture sem operação financeira.' } });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAs(page, /enter as administrator|entrer comme administrateur/i);
+  const row = page.locator('.admin-order-row').filter({ hasText: 'PREVIEW-CANCELLED-BALANCE' });
+  const button = row.getByRole('button', { name: /refund remaining balance|rembourser le solde restant/i });
+  await expect(button).toBeVisible();
+  const audit = await new AxeBuilder({ page }).include('app-admin-financial-operations').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(audit.violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await row.screenshot({ path: testInfo.outputPath('cancelled-balance-mobile.png') });
+  const confirmations = [];
+  page.once('dialog', async (dialog) => { confirmations.push(dialog.message()); await dialog.accept(); });
+  await button.click();
+  await expect(row).toContainText(/refunded|remboursée/i);
+  await expect(page.locator('.management-notice.success')).toContainText(/refund balance is settled|solde du remboursement est réglé/i);
+  await expect(page.locator('.management-notice.success')).not.toContainText('Mensagem bruta');
+  expect(confirmations.join(' ')).toMatch(/stock will not be restored again|stock ne sera pas réintégré une seconde fois/i);
+  expect(requested).toBe(true);
+});
+
 test('administrator reviews an external refund in an accessible mobile form without sending another refund', async ({ page }, testInfo) => {
   let reviewed = false;
   const issue = { refundId: 're_preview1', orderId: 1, orderNumber: 'PREVIEW-REFUND', paymentIntentId: 'pi_preview1',

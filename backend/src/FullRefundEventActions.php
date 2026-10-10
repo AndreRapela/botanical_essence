@@ -174,15 +174,16 @@ trait FullRefundEventActions
             $totalCents = $this->cents((string) $row['total']);
             $alreadyCounted = $row['status'] === 'manual' && $row['provider_error_code'] === 'manual_refunded';
             $refundedCents = (int) $row['payment_refunded_cents'] + ($alreadyCounted ? 0 : (int) $row['amount_cents']);
-            if ($refundedCents !== $totalCents) {
-                throw new HttpException('O valor confirmado na Stripe não fecha exatamente o total reembolsável do pedido.', 409, [], 'stripe_refund_amount_mismatch');
+            if ($refundedCents < 0 || $refundedCents > $totalCents) {
+                throw new HttpException('O valor confirmado na Stripe excede o saldo contabilizável deste pedido.', 409, [], 'stripe_refund_amount_mismatch');
             }
-
+            $fullyRefunded = $refundedCents === $totalCents;
+            $preservePending = !$currentAttempt && $row['payment_status'] === 'refund_pending';
+            $paymentStatus = $preservePending ? 'refund_pending' : RefundStatePolicy::settledPaymentStatus($refundedCents, $totalCents);
             $withdrawalRequestId = $row['withdrawal_request_id'] === null ? null : (int) $row['withdrawal_request_id'];
-            if ($withdrawalRequestId === null && !in_array($row['current_order_status'], ['confirmed', 'preparing', 'cancelled'], true)) {
-                throw new HttpException('O pedido mudou para um estado que exige reconciliação operacional antes do reembolso.', 409);
-            }
-            if ($withdrawalRequestId === null && $row['current_order_status'] !== 'cancelled') {
+            $fulfillmentReview = $withdrawalRequestId === null && !in_array($row['current_order_status'], ['confirmed', 'preparing', 'cancelled'], true);
+            $cancelOrder = $fullyRefunded && $withdrawalRequestId === null && !$fulfillmentReview;
+            if ($cancelOrder && $row['current_order_status'] !== 'cancelled') {
                 $this->restoreStock((int) $row['order_id']);
             }
 
@@ -196,40 +197,61 @@ trait FullRefundEventActions
                 if ($ownsTransaction) $this->pdo->commit();
                 return true;
             }
+            // An older success contributes money but cannot replace the identity or
+            // outcome of a newer in-flight attempt. Financial and fulfillment states
+            // are separate: an authorized refund can succeed after either changes.
+            $currentFields = $currentAttempt ? ', payment_refund_id = :refundId, payment_refund_outcome = \'succeeded\',
+                payment_refund_error_code = :errorCode, payment_refund_error_message = :errorMessage,
+                payment_refund_error_http_status = NULL' : '';
             $saveOrder = $this->pdo->prepare(
                 "UPDATE orders SET status = IF(:cancelOrder = 1, 'cancelled', status),
-                        payment_status = 'refunded', payment_refunded_cents = :refundedCents,
-                        payment_refund_id = :refundId, payment_refund_outcome = 'succeeded',
-                        payment_refund_error_code = NULL, payment_refund_error_message = NULL,
-                        payment_refund_error_http_status = NULL, reservation_expires_at = NULL
+                        payment_status = :paymentStatus, payment_refunded_cents = :refundedCents,
+                        reservation_expires_at = NULL {$currentFields}
                  WHERE id = :id AND payment_intent_id = :paymentIntent"
             );
-            $saveOrder->execute([
-                ':cancelOrder' => $withdrawalRequestId === null ? 1 : 0,
-                ':refundedCents' => $refundedCents, ':refundId' => $refundId,
+            $parameters = [
+                ':cancelOrder' => (int) $cancelOrder, ':paymentStatus' => $paymentStatus,
+                ':refundedCents' => $refundedCents,
                 ':id' => $row['order_id'], ':paymentIntent' => $paymentIntentId,
-            ]);
-            if ($saveOrder->rowCount() !== 1) throw new HttpException('O pedido mudou durante a confirmação do reembolso.', 409);
+            ];
+            if ($currentAttempt) {
+                $parameters += [':refundId' => $refundId,
+                    ':errorCode' => $fulfillmentReview ? 'refund_fulfillment_review_required' : ($fullyRefunded ? null : 'refund_balance_remaining'),
+                    ':errorMessage' => $fulfillmentReview ? 'The authorized refund succeeded after fulfillment changed; review shipment or return handling. Stock was not restored.'
+                        : ($fullyRefunded ? null : 'The authorized amount was refunded, but an earlier credit changed. Review the remaining balance before authorizing another refund.')];
+            }
+            $saveOrder->execute($parameters);
+            // The row is already locked and its payment identity was checked above.
+            // A manually counted older success can legitimately leave it unchanged;
+            // MySQL reports zero changed rows in that case, not a lost order.
 
-            if (!$alreadyCounted) {
-                $this->queueFullRefundConfirmation((int) $row['order_id'], $refundId);
+            if (!$alreadyCounted || !$fullyRefunded) {
+                if ($fullyRefunded && !$preservePending) {
+                    $this->queueFullRefundConfirmation((int) $row['order_id'], $refundId);
+                } else {
+                    $this->pdo->prepare("INSERT IGNORE INTO payment_notification_outbox (order_id, notification_type, reference_id)
+                        VALUES (:id, 'refund_confirmation', :attempt)")
+                        ->execute([':id' => $row['order_id'], ':attempt' => (string) $row['attempt']]);
+                }
             }
             if ($withdrawalRequestId !== null) {
                 $returnLock = $this->pdo->prepare('SELECT status FROM withdrawal_requests WHERE id = :id LIMIT 1 FOR UPDATE');
                 $returnLock->execute([':id' => $withdrawalRequestId]);
                 $previousReturnStatus = $returnLock->fetchColumn();
                 if (in_array($previousReturnStatus, ['refund_pending', 'refund_failed'], true)) {
-                    $updateReturn = $this->pdo->prepare("UPDATE withdrawal_requests SET status = 'refunded' WHERE id = :id AND status = :previousStatus");
-                    $updateReturn->execute([':id' => $withdrawalRequestId, ':previousStatus' => $previousReturnStatus]);
+                    $returnStatus = $fullyRefunded ? 'refunded' : 'return_received';
+                    $updateReturn = $this->pdo->prepare('UPDATE withdrawal_requests SET status = :status WHERE id = :id AND status = :previousStatus');
+                    $updateReturn->execute([':status' => $returnStatus, ':id' => $withdrawalRequestId, ':previousStatus' => $previousReturnStatus]);
                     if ($updateReturn->rowCount() === 1) {
                         $event = $this->pdo->prepare(
                             'INSERT INTO withdrawal_request_events (request_id, actor_role, event_name, previous_status, new_status, note)
-                             VALUES (:id, \'system\', :eventName, :previous, \'refunded\', :note)'
+                             VALUES (:id, \'system\', :eventName, :previous, :status, :note)'
                         );
                         $event->execute([
                             ':id' => $withdrawalRequestId,
-                            ':eventName' => $previousReturnStatus === 'refund_failed' ? 'refund.confirmed_after_manual_resolution' : 'refund.confirmed',
-                            ':previous' => $previousReturnStatus, ':note' => 'Full refund attempt #' . $row['attempt'] . ' confirmed by Stripe.',
+                            ':eventName' => !$fullyRefunded ? 'refund.balance_remaining' : ($previousReturnStatus === 'refund_failed' ? 'refund.confirmed_after_manual_resolution' : 'refund.confirmed'),
+                            ':previous' => $previousReturnStatus, ':status' => $returnStatus,
+                            ':note' => 'Authorized refund attempt #' . $row['attempt'] . ' confirmed; remaining=' . ($totalCents - $refundedCents) . ' cents.',
                         ]);
                     }
                 }
@@ -241,7 +263,8 @@ trait FullRefundEventActions
             $audit->execute([
                 ':adminId' => $adminId, ':orderId' => $row['order_id'],
                 ':previous' => (string) $row['payment_status'],
-                ':new' => 'refunded:' . $refundedCents . 'cents; attempt=' . $row['attempt'] . '; refund=' . $refundId,
+                ':new' => $paymentStatus . ':' . $refundedCents . 'cents; attempt=' . $row['attempt'] . '; refund=' . $refundId
+                    . '; remaining=' . ($totalCents - $refundedCents) . '; fulfillment_review=' . (int) $fulfillmentReview,
             ]);
             if ($ownsTransaction) $this->pdo->commit();
             return true;

@@ -8,8 +8,14 @@ trait RefundAdminResultActions
     private function applyAdminRefundResult(array $order, array $refund, int $adminId, ?int $withdrawalRequestId = null): array
     {
         if ($this->applyFullRefundAttemptEvent($refund, $adminId)) {
+            if (($refund['status'] ?? '') === 'succeeded') {
+                $current = $this->orderForAdmin((string) $order['order_number']);
+                $remaining = $current ? $this->cents((string) $current['total']) - (int) $current['payment_refunded_cents'] : null;
+                return ['code' => $remaining === 0 ? 'refund_balance_confirmed' : 'refund_balance_remaining', 'message' => $remaining === 0
+                    ? 'A Stripe confirmou o valor autorizado e o saldo financeiro foi conciliado. Confira o estado de entrega antes de qualquer operação de estoque.'
+                    : 'A Stripe confirmou o valor autorizado. Ainda há saldo a revisar; não foi enviado outro reembolso nem liberado estoque automaticamente.'];
+            }
             return match ((string) ($refund['status'] ?? '')) {
-                'succeeded' => ['message' => 'A Stripe confirmou o reembolso integral; pedido, estoque e notificações foram conciliados.'],
                 'pending', 'requires_action' => ['message' => 'A Stripe aceitou o reembolso integral, que permanece em processamento até confirmação final.'],
                 'failed', 'canceled' => ['message' => 'A Stripe confirmou que esta tentativa integral não foi reembolsada; o pedido permanece pago.'],
                 default => ['message' => 'O estado do reembolso integral foi registrado para reconciliação.'],

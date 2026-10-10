@@ -2379,6 +2379,7 @@ $tests += require __DIR__ . '/refund-identity-regressions.php';
 $tests += require __DIR__ . '/external-refund-regressions.php';
 $tests += require __DIR__ . '/late-refund-regressions.php';
 $tests += require __DIR__ . '/refund-balance-regressions.php';
+$tests += require __DIR__ . '/full-refund-projection-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

@@ -13,11 +13,16 @@ function refundBalanceGateway(PDO $pdo, array &$refunds, array &$posts, ?Closure
     return new StripeGateway(static function (string $url, $context) use ($pdo, &$refunds, &$posts, $onPost): array {
         $http = stream_context_get_options($context)['http'];
         assertSameValue(false, $pdo->inTransaction(), 'Stripe I/O must stay outside financial transactions.');
-        assertSameValue('/v1/refunds', parse_url($url, PHP_URL_PATH));
         if ($http['method'] === 'GET') {
+            if (parse_url($url, PHP_URL_PATH) !== '/v1/refunds') {
+                $id = basename((string) parse_url($url, PHP_URL_PATH));
+                assertSameValue(true, isset($refunds[$id]), 'Only a known fixture refund may be retrieved.');
+                return ['body' => json_encode($refunds[$id], JSON_THROW_ON_ERROR), 'statusLine' => 'HTTP/1.1 200 OK'];
+            }
             return ['body' => json_encode(['object' => 'list', 'data' => array_values($refunds), 'has_more' => false], JSON_THROW_ON_ERROR), 'statusLine' => 'HTTP/1.1 200 OK'];
         }
         assertSameValue('POST', $http['method']);
+        assertSameValue('/v1/refunds', parse_url($url, PHP_URL_PATH));
         parse_str($http['content'], $body);
         $posts[] = $body;
         if ($onPost !== null) return $onPost($body);

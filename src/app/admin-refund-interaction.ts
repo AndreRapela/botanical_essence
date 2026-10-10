@@ -6,10 +6,30 @@ export type RefundResolution = 'refunded' | 'not_refunded';
 type Localize = (english: string, french: string) => string;
 type Submit = (action: AdminOrderAction, resolution?: RefundResolution, reason?: string) => void;
 
+export function adminRefundResultMessage(result: { message: string; code?: string }, copy: Localize): string {
+  if (result.code === 'refund_balance_confirmed') {
+    return copy('Stripe confirmed the authorized amount and the refund balance is settled. Check fulfillment before any stock operation.',
+      'Stripe a confirmé le montant autorisé et le solde du remboursement est réglé. Vérifiez la livraison avant toute opération de stock.');
+  }
+  if (result.code === 'refund_balance_remaining') {
+    return copy('Stripe confirmed the authorized amount, but a balance remains to review. No additional refund was sent and stock was not restored automatically.',
+      'Stripe a confirmé le montant autorisé, mais un solde reste à vérifier. Aucun remboursement supplémentaire n’a été envoyé et le stock n’a pas été réintégré automatiquement.');
+  }
+  return result.message;
+}
+
 export function confirmAdminOrderCancellation(order: AdminOrder, copy: Localize): boolean {
-  if (['shipped', 'delivered', 'cancelled'].includes(order.status)) return false;
+  const cancelledBalance = order.status === 'cancelled' && order.paymentProvider === 'stripe'
+    && ['paid', 'partially_refunded'].includes(order.paymentStatus)
+    && ['none', 'succeeded', 'definitive_failure', 'manual_refunded', 'manual_not_refunded'].includes(order.refundOutcome)
+    && !order.externalRefundUnmatched;
+  if (['shipped', 'delivered'].includes(order.status) || (order.status === 'cancelled' && !cancelledBalance)) return false;
   const localSimulation = order.paymentProvider === 'local_test' && order.testPayment;
-  const message = localSimulation
+  const message = cancelledBalance
+    ? order.testPayment
+      ? copy('This order is already cancelled. Stripe test mode will refund only its remaining balance; no real money will move and stock will not be restored again. Continue?', 'Cette commande est déjà annulée. Le mode test de Stripe remboursera uniquement le solde restant ; aucun argent réel ne sera transféré et le stock ne sera pas réintégré une seconde fois. Continuer ?')
+      : copy('This order is already cancelled. Refund only the remaining balance? Previous refunds are preserved and stock will not be restored again. If Stripe is unavailable, the attempt remains protected for reconciliation.', 'Cette commande est déjà annulée. Rembourser uniquement le solde restant ? Les remboursements précédents sont conservés et le stock ne sera pas réintégré une seconde fois. Si Stripe est indisponible, la tentative reste protégée pour réconciliation.')
+    : localSimulation
     ? copy('This is a local test purchase; cancelling it will not move any money. Continue?', 'Cet achat est une simulation locale ; son annulation ne déplacera aucun argent. Continuer ?')
     : ['paid', 'partially_refunded'].includes(order.paymentStatus)
       ? order.testPayment

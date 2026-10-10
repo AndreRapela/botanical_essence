@@ -22,7 +22,8 @@ final class ExternalRefundIntegrationHarness
 
     public function apply(array $refund): void { $this->applyRefundEvent($refund); }
     public function startPartial(): array { return $this->startPartialRefundAttempt($this->order(), 1000, 'Test provider preflight', 42); }
-    public function startFull(): array { return $this->startAdminRefundAttempt($this->order(), 42); }
+    public function startFull(?int $withdrawalId = null): array { return $this->startAdminRefundAttempt($this->order(), 42, $withdrawalId); }
+    public function fullResult(array $refund): array { return $this->applyAdminRefundResult($this->order(), $refund, 42); }
     public function resolvePartial(string $resolution, ?array $selectedOrder = null): array { return $this->resolvePartialRefundAttempt($selectedOrder ?? $this->order(), 42, $resolution, 'Provider independently verified this manual decision'); }
     public function resolveFull(string $resolution): array { return $this->resolveAdminRefund($this->order(), 42, $resolution, 'Provider independently verified this manual decision'); }
     public function rejectFull(int $attempt): void { $this->recordDefinitiveRefundFailure(1, 'pi_external1', $attempt, null, 'amount_too_large', 'Provider rejected the exact amount', 400, 42); }
@@ -422,14 +423,17 @@ return [
             $pdo = externalRefundDatabase(); if ($pdo === null) return;
             externalRefundAttempt($pdo, 1, 'pending', null, 're_external1', 'full', 10000);
             externalRefundAttempt($pdo, 2, 'pending', null, 're_other2');
-            $pdo->exec("UPDATE orders SET payment_status = 'refund_pending', payment_refund_outcome = 'pending'");
+            $pdo->exec("UPDATE orders SET payment_status = 'refund_pending', payment_refund_outcome = 'pending', payment_refund_id = 're_other2'");
             $refund = [...externalRefundRow('re_external1', 'succeeded', 10000), 'metadata' => ['order_number' => 'EXTERNAL-REFUND-1', 'refund_attempt' => '2']];
             $refunds = ['re_external1' => $refund]; $calls = [];
             $harness = new ExternalRefundIntegrationHarness($pdo, externalRefundGateway($refunds, $calls));
             $harness->apply($refund);
             $harness->apply($refund);
             assertSameValue(10000, (int) $harness->order()['payment_refunded_cents']);
-            assertSameValue('refunded', $harness->order()['payment_status']);
+            assertSameValue('refund_pending', $harness->order()['payment_status']);
+            assertSameValue('re_other2', $harness->order()['payment_refund_id']);
+            assertSameValue('pending', $harness->order()['payment_refund_outcome']);
+            assertSameValue('succeeded', $pdo->query('SELECT status FROM payment_refund_attempts WHERE attempt = 1')->fetchColumn());
             assertSameValue(6, (int) $pdo->query('SELECT stock FROM products')->fetchColumn());
             assertSameValue('pending', $pdo->query('SELECT status FROM payment_refund_attempts WHERE attempt = 2')->fetchColumn());
         });
