@@ -40,6 +40,7 @@ trait RefundAdminActions
             $refundAmountCents = $this->cents((string) $current['total']) - (int) $current['payment_refunded_cents'];
             if ($refundAmountCents < 1) throw new HttpException('Não há saldo pago disponível para um reembolso integral.', 409);
             ExternalRefundService::assertReconciled($this->pdo, (int) $order['id']);
+            (new RefundLedgerSafety($this->pdo))->assertNoUnresolved((int) $order['id']);
             if ($withdrawalRequestId === null) {
                 $activeReturn = $this->pdo->prepare("SELECT id FROM withdrawal_requests WHERE order_id = :id
                     AND status IN ('submitted','reviewing','instructions_sent','return_received','refund_pending','refund_failed') LIMIT 1");

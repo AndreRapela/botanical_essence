@@ -20,6 +20,7 @@
 .admin-order-row > div:nth-child(2) small { max-width: 320px; overflow-wrap: anywhere; }
 .admin-warning { background: #fff3ed; border: 1px solid rgba(147,74,57,.2); border-radius: 8px; color: #793d30 !important; line-height: 1.45; margin-top: 8px !important; max-width: 420px; overflow-wrap: anywhere; padding: 8px 10px; white-space: normal; }
 .admin-warning b { display: block; font-size: 10px; margin-bottom: 3px; }
+.refund-history-reference { overflow-wrap: anywhere; white-space: normal; }
 .admin-withdrawal-row { align-items: start; grid-template-columns: minmax(190px, 1fr) minmax(135px, .6fr) minmax(220px, 1.2fr); }
 .admin-withdrawal-row > div { min-width: 0; }
 .admin-withdrawal-row > div:first-child small, .admin-withdrawal-row > div:nth-child(2) small { overflow-wrap: anywhere; }
@@ -45,4 +46,10 @@
   .admin-withdrawal-row > span, .admin-withdrawal-row > .row-actions { grid-column: 1; }
   .row-actions { grid-column: 2 / -1; flex-wrap: wrap; gap: 7px; justify-content: flex-start; }
   .row-actions button { min-height: 44px; min-width: 44px; padding: 10px 4px; }
+}
+
+@media (max-width: 480px) {
+  .admin-order-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .admin-order-row > div, .admin-order-row > span, .admin-order-row > .row-actions { grid-column: 1 / -1; min-width: 0; }
+  .admin-order-row > span { overflow-wrap: anywhere; }
 }

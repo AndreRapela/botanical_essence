@@ -66,6 +66,33 @@ describe('admin financial operations', () => {
     component = fixture.componentInstance;
   });
 
+  it('exposes unresolved historical references in EN and FR and offers only history lookup instead of new refunds', () => {
+    const historical = { ...order, status: 'confirmed', paymentStatus: 'partially_refunded', refundOutcome: 'definitive_failure' as const,
+      refundAttempt: 3, refundedTotalCents: 500, historicalRefunds: [
+        { attempt: 1, kind: 'partial' as const, id: 're_historical', amountCents: 500, status: 'pending' as const },
+        { attempt: 2, kind: 'full' as const, id: null, amountCents: 1500, status: 'unknown' as const }
+      ] };
+    component.orders = [historical];
+    const actions: string[] = [];
+    component.refundOrderAction.subscribe(({ action }) => actions.push(action));
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('An earlier refund is still pending or unknown');
+    expect(text).toContain('re_historical');
+    expect(text).toContain('Provider reference not yet known');
+    let buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    expect(buttons.some((button) => /Partial refund|Retry refund|Cancel & refund/.test(button.textContent ?? ''))).toBe(false);
+    buttons.find((button) => button.textContent?.includes('Check refund history'))!.click();
+    expect(actions).toEqual(['check_refund_history']);
+    component.language = 'fr';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Un remboursement antérieur est encore en attente ou inconnu');
+    expect(fixture.nativeElement.textContent).toContain('Référence du prestataire encore inconnue');
+    buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    expect(buttons.some((button) => /Remboursement partiel|Réessayer le remboursement|Annuler et rembourser/.test(button.textContent ?? ''))).toBe(false);
+    expect(buttons.some((button) => button.textContent?.includes('Vérifier l’historique des remboursements'))).toBe(true);
+  });
+
   it('keeps cancellation unavailable while Stripe session creation is ambiguous', () => {
     component.orders = [{ ...order, paymentSessionUnconfirmed: true }];
     fixture.detectChanges();

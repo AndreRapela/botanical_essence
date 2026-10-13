@@ -75,8 +75,9 @@ final class LateRefundDispatchService
             }
             try {
                 ExternalRefundService::assertReconciled($this->pdo, $id);
-            } catch (HttpException) {
-                $this->saveOutcome($row, 'manual_required', 'external_refund_unmatched', 'Review external refunds before authorizing a financial operation.');
+                (new RefundLedgerSafety($this->pdo))->assertNoUnresolved($id, $attempt);
+            } catch (HttpException $exception) {
+                $this->saveOutcome($row, 'manual_required', $exception->errorCode ?? 'refund_history_unresolved', 'Reconcile all unresolved or external refunds before authorizing a financial operation.');
                 return null;
             }
             $now = $this->now();

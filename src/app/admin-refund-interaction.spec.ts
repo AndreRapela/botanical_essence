@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminOrder } from './storefront.models';
 import { adminRefundResultMessage, confirmAdminOrderCancellation, handleAdminRefundInteraction } from './admin-refund-interaction';
+import { partialRefundAdminOrder, type AdminOrdersActionsContext } from './admin-orders.actions';
 
 function makeOrder(values: Partial<AdminOrder> = {}): AdminOrder {
   return {
@@ -25,6 +26,46 @@ const frenchCopy = (_english: string, french: string): string => french;
 
 describe('admin refund interaction safeguards', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('localizes a history check without claiming that pending refunds settled or that another refund was sent', () => {
+    const result = { code: 'refund_history_checked', message: 'Mensagem bruta da API' };
+    expect(adminRefundResultMessage(result, copy)).toContain('without sending a new refund');
+    expect(adminRefundResultMessage(result, frenchCopy)).toContain('sans envoyer de nouveau remboursement');
+  });
+
+  it('refuses cancellation and retry when a historical refund is unresolved even if the current projection settled', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const submit = vi.fn();
+    for (const status of ['confirmed', 'cancelled']) {
+      const order = makeOrder({ status, paymentStatus: 'partially_refunded', refundOutcome: 'definitive_failure',
+        historicalRefunds: [{ attempt: 1, kind: 'partial', id: 're_older', amountCents: 2500, status: 'pending' }] });
+      expect(confirmAdminOrderCancellation(order, copy)).toBe(false);
+      handleAdminRefundInteraction(order, 'retry_refund', undefined, copy, submit, vi.fn(), false);
+    }
+    expect(confirm).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('dispatches only the read-only history action without prompting and respects provider and busy safeguards', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const prompt = vi.spyOn(window, 'prompt');
+    const submit = vi.fn();
+    handleAdminRefundInteraction(makeOrder(), 'check_refund_history', undefined, copy, submit, vi.fn(), false);
+    expect(submit).toHaveBeenCalledExactlyOnceWith('check_refund_history');
+    handleAdminRefundInteraction(makeOrder(), 'check_refund_history', undefined, copy, submit, vi.fn(), true);
+    handleAdminRefundInteraction(makeOrder({ paymentProvider: 'local_test' }), 'check_refund_history', undefined, copy, submit, vi.fn(), false);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(prompt).not.toHaveBeenCalled();
+  });
+
+  it('refuses the partial-refund action before prompting when an older attempt is unresolved', () => {
+    const prompt = vi.spyOn(window, 'prompt');
+    const context = { adminLoading: false } as AdminOrdersActionsContext;
+    partialRefundAdminOrder.call(context, makeOrder({ paymentStatus: 'partially_refunded',
+      historicalRefunds: [{ attempt: 1, kind: 'partial', id: null, amountCents: 2500, status: 'unknown' }] }));
+    expect(prompt).not.toHaveBeenCalled();
+  });
 
   it('localizes a settled refund balance in EN and FR without implying automatic fulfillment', () => {
     const result = { code: 'refund_balance_confirmed', message: 'Mensagem bruta da API' };

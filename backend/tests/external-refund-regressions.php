@@ -6,12 +6,13 @@ declare(strict_types=1);
 final class ExternalRefundIntegrationHarness
 {
     use PaymentWebhookActions;
-    use RefundAdminActions;
+    use RefundAdminActions { verifyProviderRefundLedger as private verifyRealProviderRefundLedger; }
     use RefundAdminResultActions;
     use PartialRefundActions;
     public readonly ExternalRefundService $externalRefunds;
     private readonly LatePaymentRecoveryService $latePaymentRecovery;
     private readonly object $operations;
+    public ?Closure $afterPreflight = null;
 
     public function __construct(private readonly PDO $pdo, private readonly StripeGateway $stripe)
     {
@@ -28,6 +29,11 @@ final class ExternalRefundIntegrationHarness
     public function resolveFull(string $resolution): array { return $this->resolveAdminRefund($this->order(), 42, $resolution, 'Provider independently verified this manual decision'); }
     public function rejectFull(int $attempt): void { $this->recordDefinitiveRefundFailure(1, 'pi_external1', $attempt, null, 'amount_too_large', 'Provider rejected the exact amount', 400, 42); }
     public function order(): array { return $this->pdo->query('SELECT * FROM orders WHERE id = 1')->fetch(); }
+    protected function verifyProviderRefundLedger(array $order): void
+    {
+        $this->verifyRealProviderRefundLedger($order);
+        if ($this->afterPreflight !== null) ($this->afterPreflight)();
+    }
     private function orderForAdmin(string $number): ?array
     {
         $query = $this->pdo->prepare('SELECT * FROM orders WHERE order_number = :number');

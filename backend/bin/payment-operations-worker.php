@@ -26,6 +26,7 @@ require_once dirname(__DIR__) . '/src/CheckoutSessionService.php';
 require_once dirname(__DIR__) . '/src/CheckoutRecoveryService.php';
 require_once dirname(__DIR__) . '/src/CheckoutReconciliationService.php';
 require_once dirname(__DIR__) . '/src/RefundStatePolicy.php';
+require_once dirname(__DIR__) . '/src/RefundLedgerSafety.php';
 require_once dirname(__DIR__) . '/src/RefundAuditActions.php';
 require_once dirname(__DIR__) . '/src/RefundAdminActions.php';
 require_once dirname(__DIR__) . '/src/WithdrawalPolicy.php';

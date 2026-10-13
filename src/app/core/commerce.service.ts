@@ -167,7 +167,7 @@ export class CommerceService {
 
   cancelAdminOrder(
     orderNumber: string,
-    action: 'cancel' | 'check_refund' | 'retry_refund' | 'resolve_refund' | 'resolve_checkout_attempt' = 'cancel',
+    action: 'cancel' | 'check_refund' | 'check_refund_history' | 'retry_refund' | 'resolve_refund' | 'resolve_checkout_attempt' = 'cancel',
     resolution?: 'refunded' | 'not_refunded',
     reason?: string
   ): Observable<{ message: string; code?: string }> {

@@ -157,7 +157,7 @@ export function loadOlderAdminOrders(this: AdminOrdersActionsContext): void {
   }
 
 export function partialRefundAdminOrder(this: AdminOrdersActionsContext, order: AdminOrder): void {
-    if (this.adminLoading || order.paymentProvider !== 'stripe' || !['paid', 'partially_refunded'].includes(order.paymentStatus)) return;
+    if (this.adminLoading || order.historicalRefunds?.length || order.paymentProvider !== 'stripe' || !['paid', 'partially_refunded'].includes(order.paymentStatus)) return;
     const remaining = Math.max(0, Math.round(order.total * 100) - order.refundedTotalCents);
     if (remaining < 1) return;
     const amountInput = window.prompt(this.copy(

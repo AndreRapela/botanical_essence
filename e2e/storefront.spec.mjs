@@ -26,7 +26,33 @@ async function loginAs(page, rolePattern) {
 
   const roleButton = page.locator('.demo-login button').filter({ hasText: rolePattern });
   await expect(roleButton).toHaveCount(1);
-  await roleButton.click();
+  const mobileNavigation = page.getByRole('navigation', { name: 'Mobile bottom navigation' });
+  if (await mobileNavigation.isVisible()) {
+    const scrollPolicy = await page.locator('html').evaluate((element) => ({
+      behavior: getComputedStyle(element).scrollBehavior,
+      paddingBottom: parseFloat(getComputedStyle(element).scrollPaddingBottom),
+    }));
+    expect(scrollPolicy.behavior).toBe('auto');
+    await roleButton.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    const buttonBox = await roleButton.boundingBox();
+    const navigationBox = await mobileNavigation.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    expect(navigationBox).not.toBeNull();
+    expect(scrollPolicy.paddingBottom).toBeGreaterThan(navigationBox.height);
+    expect(buttonBox.y).toBeGreaterThanOrEqual(0);
+    expect(buttonBox.y + buttonBox.height).toBeLessThan(navigationBox.y);
+  }
+  const [loginResponse] = await Promise.all([
+    page.waitForResponse((response) => new URL(response.url()).pathname === '/api/auth/demo-login'
+      && response.request().method() === 'POST'),
+    roleButton.click(),
+  ]);
+  expect(loginResponse.ok(), 'demo login must succeed before checking protected content').toBeTruthy();
+  const { user } = await loginResponse.json();
+  expect(user.role).toBe(loginResponse.request().postDataJSON().role);
+  const destination = { admin: 'admin', seller: 'seller', customer: 'account' }[user.role];
+  expect(destination).toBeDefined();
+  await expect(page).toHaveURL(new RegExp(`/${destination}$`));
 }
 
 test('storefront, catalog, product, checkout and policy pages fit mobile widths', async ({ page }) => {
@@ -158,6 +184,11 @@ test('administrator confirms only the remaining balance of a partly refunded ord
   const button = row.getByRole('button', { name: /cancel & refund balance|annuler et rembourser le solde/i });
   await expect(button).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  const statusBox = await row.locator(':scope > span').boundingBox();
+  const amountBox = await row.locator(':scope > div').nth(2).boundingBox();
+  expect(statusBox).not.toBeNull();
+  expect(amountBox).not.toBeNull();
+  expect(statusBox.y + statusBox.height).toBeLessThanOrEqual(amountBox.y);
   const audit = await new AxeBuilder({ page }).include('app-admin-financial-operations').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
   expect(audit.violations).toEqual([]);
   const confirmations = [];
@@ -204,6 +235,45 @@ test('administrator can explicitly refund a cancelled order balance without canc
   await expect(page.locator('.management-notice.success')).not.toContainText('Mensagem bruta');
   expect(confirmations.join(' ')).toMatch(/stock will not be restored again|stock ne sera pas réintégré une seconde fois/i);
   expect(requested).toBe(true);
+});
+
+test('historical unresolved refunds block new admin refunds and allow only provider history lookup on mobile', async ({ page }, testInfo) => {
+  let checked = false;
+  const oldReference = 're_history' + 'x'.repeat(90);
+  const order = { id: 1, number: 'PREVIEW-HISTORICAL-REFUND', customerName: 'Preview buyer', email: 'buyer@example.test',
+    status: 'confirmed', paymentStatus: 'partially_refunded', paymentProvider: 'stripe', paymentMethod: 'card',
+    testPayment: false, refundAttempt: 2, refundAttemptIsPartial: false, refundOutcome: 'succeeded',
+    refundedTotalCents: 2500, refundAttemptAmountCents: 2500, externalRefundUnmatched: false,
+    historicalRefunds: [{ attempt: 1, kind: 'partial', id: oldReference, amountCents: 2500, status: 'pending' }],
+    refundErrorCode: null, refundErrorMessage: null, paymentSessionUnconfirmed: false, paymentReconciliationRequired: false,
+    subtotal: 100, shipping: 0, total: 100, currency: 'EUR', createdAt: '2026-10-10T10:00:00Z', items: [] };
+  await page.route('**/api/admin/orders?*', (route) => route.fulfill({ json: { data: [order], page: 1, limit: 50, total: 1, hasMore: false } }));
+  await page.route('**/api/admin/orders/cancel', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ orderNumber: order.number, action: 'check_refund_history' });
+    checked = true;
+    await route.fulfill({ json: { code: 'refund_history_checked', message: 'Mensagem bruta, apenas fixture sem operação financeira.' } });
+  });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await loginAs(page, /enter as administrator|entrer comme administrateur/i);
+  const row = page.locator('.admin-order-row').filter({ hasText: order.number });
+  await expect(row).toContainText(oldReference);
+  await expect(row.getByRole('button', { name: /partial refund|retry refund|cancel & refund|refund remaining balance|remboursement partiel|réessayer le remboursement|annuler et rembourser|rembourser le solde restant/i })).toHaveCount(0);
+  const button = row.getByRole('button', { name: /check refund history|vérifier l’historique des remboursements/i });
+  await expect(button).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  const statusBox = await row.locator(':scope > span').boundingBox();
+  const amountBox = await row.locator(':scope > div').nth(2).boundingBox();
+  expect(statusBox).not.toBeNull();
+  expect(amountBox).not.toBeNull();
+  expect(statusBox.y + statusBox.height).toBeLessThanOrEqual(amountBox.y);
+  const audit = await new AxeBuilder({ page }).include('app-admin-financial-operations').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(audit.violations).toEqual([]);
+  await row.screenshot({ path: testInfo.outputPath('historical-refund-mobile.png') });
+  await button.click();
+  await expect(page.locator('.management-notice.success')).toContainText(/without sending a new refund|sans envoyer de nouveau remboursement/i);
+  await expect(page.locator('.management-notice.success')).not.toContainText('Mensagem bruta');
+  expect(checked).toBe(true);
+  await expect(row).toContainText(oldReference);
 });
 
 test('administrator reviews an external refund in an accessible mobile form without sending another refund', async ({ page }, testInfo) => {

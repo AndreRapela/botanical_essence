@@ -139,22 +139,21 @@ final class PaymentService
                     o.payment_refunds_scan_error AS refundScanError,
                     EXISTS(SELECT 1 FROM payment_external_refunds er WHERE er.order_id = o.id AND er.resolution = 'unmatched') AS externalRefundUnmatched,
                     o.payment_refunded_cents AS refundedTotalCents,
-                    EXISTS(SELECT 1 FROM payment_refund_attempts pra
-                           WHERE pra.order_id = o.id AND pra.attempt = o.payment_refund_attempt AND pra.attempt_kind = 'partial') AS refundAttemptIsPartial,
-                    (SELECT pra.amount_cents FROM payment_refund_attempts pra
-                     WHERE pra.order_id = o.id AND pra.attempt = o.payment_refund_attempt LIMIT 1) AS refundAttemptAmountCents,
-                    (SELECT pra.reason FROM payment_refund_attempts pra
-                     WHERE pra.order_id = o.id AND pra.attempt = o.payment_refund_attempt LIMIT 1) AS refundAttemptReason,
+                    COALESCE(pra.attempt_kind = 'partial', 0) AS refundAttemptIsPartial,
+                    pra.amount_cents AS refundAttemptAmountCents, pra.reason AS refundAttemptReason,
                     o.subtotal, o.shipping_amount AS shipping, o.total, o.currency,
                     DATE_FORMAT(o.created_at, '%Y-%m-%dT%H:%i:%sZ') AS createdAt
-             FROM orders o ORDER BY paymentReconciliationRequired DESC, o.id DESC LIMIT :limit OFFSET :offset"
+             FROM orders o LEFT JOIN payment_refund_attempts pra ON pra.order_id = o.id AND pra.attempt = o.payment_refund_attempt
+             ORDER BY paymentReconciliationRequired DESC, o.id DESC LIMIT :limit OFFSET :offset"
         );
         $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
         $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
         $statement->execute();
         $orders = $statement->fetchAll();
+        $historicalRefunds = (new RefundLedgerSafety($this->pdo))->historicalUnresolvedForOrders($orders);
         foreach ($orders as &$order) {
             $order['id'] = (int) $order['id'];
+            $order['historicalRefunds'] = $historicalRefunds[$order['id']] ?? [];
             $order['testPayment'] = (bool) $order['testPayment'];
             $order['paymentSessionUnconfirmed'] = (bool) $order['paymentSessionUnconfirmed'];
             $order['paymentReconciliationRequired'] = (bool) $order['paymentReconciliationRequired'];
@@ -184,7 +183,7 @@ final class PaymentService
         Validation::allowedFields($input, ['orderNumber', 'action', 'resolution', 'reason']);
         $number = Validation::requiredString($input, 'orderNumber', 8, 32);
         $action = isset($input['action'])
-            ? Validation::oneOf($input, 'action', ['cancel', 'check_refund', 'retry_refund', 'resolve_refund', 'resolve_checkout_attempt'])
+            ? Validation::oneOf($input, 'action', ['cancel', 'check_refund', 'check_refund_history', 'retry_refund', 'resolve_refund', 'resolve_checkout_attempt'])
             : 'cancel';
         $resolution = $action === 'resolve_refund'
             ? Validation::oneOf($input, 'resolution', ['refunded', 'not_refunded'])
@@ -300,6 +299,11 @@ final class PaymentService
         }
         if ($action === 'resolve_checkout_attempt') {
             return $this->unattachedCheckoutResolver->resolve($order, $admin, (string) $reason);
+        }
+        if ($action === 'check_refund_history') {
+            if ($order['payment_provider'] !== 'stripe') throw new HttpException('O histórico de reembolsos exige um pagamento Stripe.', 409, [], 'stripe_refund_history_unavailable');
+            $this->verifyProviderRefundLedger($order);
+            return ['code' => 'refund_history_checked', 'message' => 'Histórico consultado na Stripe sem novo envio. Atualize o saldo e revise qualquer tentativa ainda pendente.'];
         }
         if ($action === 'check_refund') {
             if ($this->hasTrackedPartialRefundAttempt($order)) {

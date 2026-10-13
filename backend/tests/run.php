@@ -42,9 +42,13 @@ require_once $source . '/RefundAdminResultActions.php';
 require_once $source . '/RefundAuditActions.php';
 require_once $source . '/RefundAdminActions.php';
 require_once $source . '/RefundStatePolicy.php';
+require_once $source . '/RefundLedgerSafety.php';
 require_once $source . '/WithdrawalPolicy.php';
 require_once $source . '/PartialRefundFailureActions.php';
 require_once $source . '/PartialRefundActions.php';
+require_once $source . '/CheckoutSessionService.php';
+require_once $source . '/CheckoutRecoveryService.php';
+require_once $source . '/PaymentService.php';
 
 final class FailingPaymentNotificationMailer implements MailTransport
 {
@@ -2380,6 +2384,7 @@ $tests += require __DIR__ . '/external-refund-regressions.php';
 $tests += require __DIR__ . '/late-refund-regressions.php';
 $tests += require __DIR__ . '/refund-balance-regressions.php';
 $tests += require __DIR__ . '/full-refund-projection-regressions.php';
+$tests += require __DIR__ . '/refund-history-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

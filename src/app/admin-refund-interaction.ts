@@ -1,12 +1,16 @@
 import { AdminOrder } from './storefront.models';
 
-export type AdminRefundAction = 'check_refund' | 'retry_refund' | 'resolve_refund';
+export type AdminRefundAction = 'check_refund' | 'check_refund_history' | 'retry_refund' | 'resolve_refund';
 export type AdminOrderAction = 'cancel' | AdminRefundAction;
 export type RefundResolution = 'refunded' | 'not_refunded';
 type Localize = (english: string, french: string) => string;
 type Submit = (action: AdminOrderAction, resolution?: RefundResolution, reason?: string) => void;
 
 export function adminRefundResultMessage(result: { message: string; code?: string }, copy: Localize): string {
+  if (result.code === 'refund_history_checked') {
+    return copy('Stripe refund history was checked without sending a new refund. Review the refreshed balance and any attempt still pending.',
+      'L’historique Stripe a été vérifié sans envoyer de nouveau remboursement. Vérifiez le solde actualisé et toute tentative encore en attente.');
+  }
   if (result.code === 'refund_balance_confirmed') {
     return copy('Stripe confirmed the authorized amount and the refund balance is settled. Check fulfillment before any stock operation.',
       'Stripe a confirmé le montant autorisé et le solde du remboursement est réglé. Vérifiez la livraison avant toute opération de stock.');
@@ -19,6 +23,7 @@ export function adminRefundResultMessage(result: { message: string; code?: strin
 }
 
 export function confirmAdminOrderCancellation(order: AdminOrder, copy: Localize): boolean {
+  if (order.historicalRefunds?.length) return false;
   const cancelledBalance = order.status === 'cancelled' && order.paymentProvider === 'stripe'
     && ['paid', 'partially_refunded'].includes(order.paymentStatus)
     && ['none', 'succeeded', 'definitive_failure', 'manual_refunded', 'manual_not_refunded'].includes(order.refundOutcome)
@@ -49,11 +54,12 @@ export function handleAdminRefundInteraction(
   busy: boolean
 ): void {
   if (busy || order.paymentProvider !== 'stripe') return;
-  if (action === 'check_refund') {
+  if (action === 'check_refund' || action === 'check_refund_history') {
     submit(action);
     return;
   }
   if (action === 'retry_refund') {
+    if (order.historicalRefunds?.length) return;
     if (!['paid', 'partially_refunded'].includes(order.paymentStatus) || !['definitive_failure', 'manual_not_refunded'].includes(order.refundOutcome)) return;
     const message = order.refundOutcome === 'manual_not_refunded'
       ? copy('The previous attempt was manually verified as not refunded. Start a new attempt against the remaining balance only?', 'La tentative précédente a été vérifiée manuellement comme non remboursée. Lancer une nouvelle tentative uniquement pour le solde restant ?')

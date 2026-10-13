@@ -115,6 +115,7 @@ export interface AdminWithdrawalRequest {
 }
 
 export interface AdminOrder {
+  historicalRefunds?: ReadonlyArray<{ attempt: number; kind: 'full' | 'partial'; id: string | null; amountCents: number; status: 'pending' | 'unknown' }>;
   externalRefundUnmatched?: boolean;
   refundScanError?: string | null;
   id: number;

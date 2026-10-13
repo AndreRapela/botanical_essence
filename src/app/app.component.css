@@ -638,9 +638,9 @@ h2 em { color: var(--green-700); font-style: italic; }
   .newsletter form { margin-top: 45px; }
   .newsletter-success { justify-content: flex-start; }
   .newsletter-success h2 { font-size: 34px; }
-  .footer { gap: 40px 20px; grid-template-columns: 1fr 1fr; padding-bottom: 120px; }
+  .footer { gap: 40px 20px; grid-template-columns: 1fr 1fr; padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
   .footer-brand, .footer-contact { grid-column: 1 / -1; }
-  .footer-compact { gap: 20px 18px; padding: 28px 20px 100px; }
+  .footer-compact { gap: 20px 18px; padding: 28px 20px calc(100px + env(safe-area-inset-bottom, 0px)); }
   .footer-compact .footer-brand { display: none; }
   .footer-compact .footer-contact { padding-top: 4px; }
   .footer-compact .footer-bottom { font-size: 8px; padding-top: 12px; }
@@ -653,7 +653,7 @@ h2 em { color: var(--green-700); font-style: italic; }
   .drawer-language .language-switch button, .drawer-language .currency-switch button { height: 44px; min-width: 44px; }
   .quantity { width: 128px; }
   .quantity button { height: 44px; width: 44px; }
-  .mobile-bottom-nav { align-items: center; background: rgba(250,248,241,.97); border: 1px solid rgba(38,54,31,.12); border-radius: 26px 26px 0 0; bottom: 0; box-shadow: 0 -10px 35px rgba(38,54,31,.12); display: grid; grid-template-columns: repeat(4, 1fr); height: 78px; left: 0; padding: 8px 8px 6px; position: fixed; right: 0; z-index: 70; }
+  .mobile-bottom-nav { align-items: center; background: rgba(250,248,241,.97); border: 1px solid rgba(38,54,31,.12); border-radius: 26px 26px 0 0; bottom: 0; box-shadow: 0 -10px 35px rgba(38,54,31,.12); display: grid; grid-template-columns: repeat(4, 1fr); height: calc(78px + env(safe-area-inset-bottom, 0px)); left: 0; padding: 8px 8px calc(6px + env(safe-area-inset-bottom, 0px)); position: fixed; right: 0; z-index: 70; }
   .mobile-bottom-nav button { align-items: center; color: #4f584b; display: flex; flex-direction: column; gap: 3px; font-size: 9px; height: 60px; justify-content: center; width: 100%; }
   .mobile-bottom-nav svg { height: 25px; width: 25px; }
   .mobile-bottom-nav .active { color: var(--green-800); font-weight: 600; }

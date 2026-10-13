@@ -203,6 +203,7 @@ trait PartialRefundActions
             $select->execute([':id' => $order['id']]);
             $current = $select->fetch();
             ExternalRefundService::assertReconciled($this->pdo, (int) $order['id']);
+            (new RefundLedgerSafety($this->pdo))->assertNoUnresolved((int) $order['id']);
             if ($withdrawalRequestId === null) {
                 $activeReturn = $this->pdo->prepare(
                     "SELECT id FROM withdrawal_requests

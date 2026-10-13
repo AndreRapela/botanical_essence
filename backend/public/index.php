@@ -30,6 +30,7 @@ require_once $source . '/CheckoutSessionService.php';
 require_once $source . '/CheckoutRecoveryService.php';
 require_once $source . '/CheckoutReconciliationService.php';
 require_once $source . '/RefundStatePolicy.php';
+require_once $source . '/RefundLedgerSafety.php';
 require_once $source . '/RefundAuditActions.php';
 require_once $source . '/RefundAdminActions.php';
 require_once $source . '/WithdrawalPolicy.php';
