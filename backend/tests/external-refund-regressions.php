@@ -25,8 +25,16 @@ final class ExternalRefundIntegrationHarness
     public function startPartial(): array { return $this->startPartialRefundAttempt($this->order(), 1000, 'Test provider preflight', 42); }
     public function startFull(?int $withdrawalId = null): array { return $this->startAdminRefundAttempt($this->order(), 42, $withdrawalId); }
     public function fullResult(array $refund): array { return $this->applyAdminRefundResult($this->order(), $refund, 42); }
-    public function resolvePartial(string $resolution, ?array $selectedOrder = null): array { return $this->resolvePartialRefundAttempt($selectedOrder ?? $this->order(), 42, $resolution, 'Provider independently verified this manual decision'); }
-    public function resolveFull(string $resolution): array { return $this->resolveAdminRefund($this->order(), 42, $resolution, 'Provider independently verified this manual decision'); }
+    public function resolvePartial(string $resolution, ?array $selectedOrder = null): array
+    {
+        $order = $selectedOrder ?? $this->order();
+        return $this->resolvePartialRefundAttempt($order, 42, $resolution, 'Provider independently verified this manual decision', manualTargetForOrder($this->pdo, $order));
+    }
+    public function resolveFull(string $resolution): array
+    {
+        $order = $this->order();
+        return $this->resolveAdminRefund($order, 42, $resolution, 'Provider independently verified this manual decision', manualTargetForOrder($this->pdo, $order));
+    }
     public function rejectFull(int $attempt): void { $this->recordDefinitiveRefundFailure(1, 'pi_external1', $attempt, null, 'amount_too_large', 'Provider rejected the exact amount', 400, 42); }
     public function order(): array { return $this->pdo->query('SELECT * FROM orders WHERE id = 1')->fetch(); }
     protected function verifyProviderRefundLedger(array $order): void

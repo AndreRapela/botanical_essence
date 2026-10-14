@@ -66,6 +66,28 @@ describe('admin financial operations', () => {
     component = fixture.componentInstance;
   });
 
+  it('offers manual decisions only with an unresolved, amount-bound selection and hides them after settlement', () => {
+    const pending = { ...order, status: 'confirmed', paymentStatus: 'refund_pending', refundAttempt: 2,
+      refundOutcome: 'unknown' as const, refundAttemptAmountCents: 2000, refundId: 're_selecteddisplayed' };
+    const events: string[] = [];
+    component.refundOrderAction.subscribe((event) => events.push(`${event.action}:${event.resolution}`));
+    component.orders = [pending]; fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Current refund attempt #2');
+    expect(fixture.nativeElement.textContent).toContain('re_selecteddisplayed');
+    expect(fixture.nativeElement.textContent).toContain('Attempt amount:');
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const resolve = buttons.find((button) => button.textContent?.includes('Resolve as not refunded'));
+    expect(resolve).toBeDefined(); resolve?.click();
+    expect(events).toEqual(['resolve_refund:not_refunded']);
+    for (const row of [{ ...pending, paymentStatus: 'paid', refundOutcome: 'succeeded' as const },
+      { ...pending, refundAttemptAmountCents: undefined },
+      { ...pending, refundAttemptIsPartial: true, refundAttemptAmountCents: null }]) {
+      component.orders = [row]; fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).not.toContain('Resolve as refunded');
+      expect(fixture.nativeElement.textContent).not.toContain('Resolve as not refunded');
+    }
+  });
+
   it('exposes unresolved historical references in EN and FR and offers only history lookup instead of new refunds', () => {
     const historical = { ...order, status: 'confirmed', paymentStatus: 'partially_refunded', refundOutcome: 'definitive_failure' as const,
       refundAttempt: 3, refundedTotalCents: 500, historicalRefunds: [

@@ -1384,13 +1384,16 @@ describe('CommerceService API contracts', () => {
     expect(historyCheck.request.body).toEqual({ orderNumber: 'BE-20261004-ABCDEF1234', action: 'check_refund_history' });
     expect(historyCheck.request.headers.get('X-CSRF-Token')).toBe('csrf-commerce');
     historyCheck.flush({ code: 'refund_history_checked', message: 'Provider history checked.' });
-    service.cancelAdminOrder('BE-20261004-ABCDEF1234', 'resolve_refund', 'refunded', 'Verified with Stripe records').subscribe();
+    const refundTarget = { orderNumber: 'BE-20261004-ABCDEF1234', attempt: 2, refundId: 're_verified2',
+      kind: 'partial' as const, amountCents: 1000, refundedTotalCents: 2500, outcome: 'unknown' as const, totalCents: 10000, currency: 'EUR' as const };
+    service.cancelAdminOrder('BE-20261004-ABCDEF1234', 'resolve_refund', 'refunded', 'Verified with Stripe records', refundTarget).subscribe();
     const resolution = http.expectOne('/api/admin/orders/cancel');
     expect(resolution.request.body).toEqual({
       orderNumber: 'BE-20261004-ABCDEF1234',
       action: 'resolve_refund',
       resolution: 'refunded',
-      reason: 'Verified with Stripe records'
+      reason: 'Verified with Stripe records',
+      refundTarget
     });
     expect(resolution.request.headers.get('X-CSRF-Token')).toBe('csrf-commerce');
     resolution.flush({ message: 'Resolved.' });

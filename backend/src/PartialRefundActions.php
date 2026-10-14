@@ -56,7 +56,7 @@ trait PartialRefundActions
         return $this->applyPartialRefundResult($order, $refund, $adminId);
     }
 
-    private function resolvePartialRefundAttempt(array $order, int $adminId, string $resolution, string $reason): array
+    private function resolvePartialRefundAttempt(array $order, int $adminId, string $resolution, string $reason, RefundResolutionTarget $target): array
     {
         if (!$this->hasTrackedPartialRefundAttempt($order)) {
             throw new HttpException('A tentativa atual não é um reembolso parcial rastreado.', 409);
@@ -64,18 +64,19 @@ trait PartialRefundActions
         $this->pdo->beginTransaction();
         try {
             $attempt = (int) $order['payment_refund_attempt'];
+            $orderLock = $this->pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1 FOR UPDATE');
+            $orderLock->execute([':id' => $order['id']]);
+            $current = $orderLock->fetch();
             $lock = $this->pdo->prepare(
                 "SELECT * FROM payment_refund_attempts WHERE order_id = :orderId AND attempt = :attempt AND attempt_kind = 'partial' LIMIT 1 FOR UPDATE"
             );
             $lock->execute([':orderId' => $order['id'], ':attempt' => $attempt]);
             $refundAttempt = $lock->fetch();
-            $orderLock = $this->pdo->prepare('SELECT status, payment_status, payment_refund_attempt, payment_refunded_cents, total FROM orders WHERE id = :id LIMIT 1 FOR UPDATE');
-            $orderLock->execute([':id' => $order['id']]);
-            $current = $orderLock->fetch();
             if (!$refundAttempt || !$current || !in_array($refundAttempt['status'], ['pending', 'unknown'], true)
                 || $current['payment_status'] !== 'refund_pending' || (int) $current['payment_refund_attempt'] !== $attempt) {
                 throw new HttpException('A tentativa parcial não está em um estado incerto que possa ser resolvido manualmente.', 409);
             }
+            $target->assertMatches($this->pdo, $current, $refundAttempt);
             $newRefunded = (int) $current['payment_refunded_cents'];
             if ($resolution === 'refunded') {
                 $newRefunded += (int) $refundAttempt['amount_cents'];
@@ -141,7 +142,7 @@ trait PartialRefundActions
                 ':new' => $newPaymentStatus . ':' . $resolution . '; attempt=' . $attempt . '; ' . $reason,
             ]);
             $this->pdo->commit();
-            return ['message' => $resolution === 'refunded'
+            return ['code' => 'refund_resolved_manually', 'message' => $resolution === 'refunded'
                 ? 'Resolução manual auditada. O total reembolsado foi atualizado; confirme previamente a transação na Stripe.'
                 : 'Resolução manual auditada como não reembolsado; o valor continua devido e pode receber nova tentativa.'];
         } catch (Throwable $exception) {

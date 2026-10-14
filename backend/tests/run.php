@@ -43,6 +43,7 @@ require_once $source . '/RefundAuditActions.php';
 require_once $source . '/RefundAdminActions.php';
 require_once $source . '/RefundStatePolicy.php';
 require_once $source . '/RefundLedgerSafety.php';
+require_once $source . '/RefundResolutionTarget.php';
 require_once $source . '/WithdrawalPolicy.php';
 require_once $source . '/PartialRefundFailureActions.php';
 require_once $source . '/PartialRefundActions.php';
@@ -100,7 +101,7 @@ final class FullRefundWebhookTestHarness
 
     public function resolveFullAttempt(array $order, int $adminId, string $resolution, string $reason): array
     {
-        return $this->resolveAdminRefund($order, $adminId, $resolution, $reason);
+        return $this->resolveAdminRefund($order, $adminId, $resolution, $reason, manualTargetForOrder($this->pdo, $order));
     }
 
     public function performAdminRefundAttempt(array $order, string $paymentIntentId, int $attempt, int $adminId, int $amountCents, ?int $withdrawalRequestId = null): array
@@ -2385,6 +2386,7 @@ $tests += require __DIR__ . '/late-refund-regressions.php';
 $tests += require __DIR__ . '/refund-balance-regressions.php';
 $tests += require __DIR__ . '/full-refund-projection-regressions.php';
 $tests += require __DIR__ . '/refund-history-regressions.php';
+$tests += require __DIR__ . '/manual-refund-target-regressions.php';
 $tests += require __DIR__ . '/auth-regressions.php';
 
 $failures = 0;

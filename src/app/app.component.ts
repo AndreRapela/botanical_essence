@@ -1,5 +1,6 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
 import type { AdminOrderAction, AdminRefundAction } from './admin-refund-interaction';
+import type { RefundResolutionSnapshot } from './storefront.models';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -1019,7 +1020,7 @@ export class StorefrontComponent {
 
   adminRefundAction(order: AdminOrder, action: AdminRefundAction, resolution?: 'refunded' | 'not_refunded'): void { return adminRefundActionAction.call(this, order, action, resolution); }
 
-  runAdminOrderAction(order: AdminOrder, action: AdminOrderAction | 'resolve_checkout_attempt', resolution?: 'refunded' | 'not_refunded', reason?: string): void { return runAdminOrderActionAction.call(this, order, action, resolution, reason); }
+  runAdminOrderAction(order: AdminOrder, action: AdminOrderAction | 'resolve_checkout_attempt', resolution?: 'refunded' | 'not_refunded', reason?: string, target?: RefundResolutionSnapshot): void { return runAdminOrderActionAction.call(this, order, action, resolution, reason, target); }
 
   editAdminUser(user: AdminUser): void { return editAdminUserAction.call(this, user); }
 

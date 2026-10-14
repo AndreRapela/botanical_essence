@@ -131,7 +131,7 @@ final class PaymentService
                      AND (o.payment_session_attempted_at <= CURRENT_TIMESTAMP - INTERVAL 23 HOUR
                           OR (o.payment_session_attempted_at IS NULL
                               AND o.created_at <= CURRENT_TIMESTAMP - INTERVAL 23 HOUR))) AS paymentReconciliationRequired,
-                    o.payment_refund_id AS refundId, o.payment_refund_attempt AS refundAttempt,
+                    COALESCE(pra.stripe_refund_id, o.payment_refund_id) AS refundId, o.payment_refund_attempt AS refundAttempt,
                     o.payment_refund_outcome AS refundOutcome,
                     o.payment_refund_error_code AS refundErrorCode,
                     o.payment_refund_error_message AS refundErrorMessage,
@@ -154,6 +154,7 @@ final class PaymentService
         foreach ($orders as &$order) {
             $order['id'] = (int) $order['id'];
             $order['historicalRefunds'] = $historicalRefunds[$order['id']] ?? [];
+            $order['currency'] = strtoupper((string) $order['currency']);
             $order['testPayment'] = (bool) $order['testPayment'];
             $order['paymentSessionUnconfirmed'] = (bool) $order['paymentSessionUnconfirmed'];
             $order['paymentReconciliationRequired'] = (bool) $order['paymentReconciliationRequired'];
@@ -180,7 +181,7 @@ final class PaymentService
 
     public function cancelForAdmin(array $input, array $admin): array
     {
-        Validation::allowedFields($input, ['orderNumber', 'action', 'resolution', 'reason']);
+        Validation::allowedFields($input, ['orderNumber', 'action', 'resolution', 'reason', 'refundTarget']);
         $number = Validation::requiredString($input, 'orderNumber', 8, 32);
         $action = isset($input['action'])
             ? Validation::oneOf($input, 'action', ['cancel', 'check_refund', 'check_refund_history', 'retry_refund', 'resolve_refund', 'resolve_checkout_attempt'])
@@ -191,6 +192,10 @@ final class PaymentService
         $reason = in_array($action, ['resolve_refund', 'resolve_checkout_attempt'], true)
             ? Validation::requiredString($input, 'reason', 10, 500)
             : null;
+        $refundTarget = $action === 'resolve_refund' ? RefundResolutionTarget::fromInput($input) : null;
+        if ($action !== 'resolve_refund' && array_key_exists('refundTarget', $input)) {
+            throw new HttpException('A seleção manual só é aceita ao resolver uma tentativa de reembolso.', 422, [], 'refund_target_invalid');
+        }
         $this->limiter->assertAllowed('admin-write', (string) $admin['id'], 300, 3600);
         $order = $this->orderForAdmin($number);
         if ($order === null) {
@@ -200,7 +205,7 @@ final class PaymentService
         $orderId = (int) $order['id'];
         $this->orderLock->acquire($orderId);
         try {
-            return $this->cancelForAdminWithPaymentLock($number, $admin, $action, $resolution, $reason);
+            return $this->cancelForAdminWithPaymentLock($number, $admin, $action, $resolution, $reason, $refundTarget);
         } finally {
             $this->orderLock->release($orderId);
         }
@@ -286,7 +291,8 @@ final class PaymentService
         array $admin,
         string $action = 'cancel',
         ?string $resolution = null,
-        ?string $reason = null
+        ?string $reason = null,
+        ?RefundResolutionTarget $refundTarget = null
     ): array
     {
         $order = $this->orderForAdmin($number);
@@ -318,10 +324,11 @@ final class PaymentService
             return $this->retryAdminRefund($order, (int) $admin['id']);
         }
         if ($action === 'resolve_refund') {
+            if ($refundTarget === null) throw new LogicException('Manual refund target was not validated.');
             if ($this->hasTrackedPartialRefundAttempt($order)) {
-                return $this->resolvePartialRefundAttempt($order, (int) $admin['id'], (string) $resolution, (string) $reason);
+                return $this->resolvePartialRefundAttempt($order, (int) $admin['id'], (string) $resolution, (string) $reason, $refundTarget);
             }
-            return $this->resolveAdminRefund($order, (int) $admin['id'], (string) $resolution, (string) $reason);
+            return $this->resolveAdminRefund($order, (int) $admin['id'], (string) $resolution, (string) $reason, $refundTarget);
         }
         $cancelledRefundRetry = $order['status'] === 'cancelled'
             && $order['payment_provider'] === 'stripe'

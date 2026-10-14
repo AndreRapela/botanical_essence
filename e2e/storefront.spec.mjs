@@ -276,6 +276,80 @@ test('historical unresolved refunds block new admin refunds and allow only provi
   await expect(row).toContainText(oldReference);
 });
 
+test('manual full and partial decisions require the exact displayed selection and never retry a stale decision automatically', async ({ page }, testInfo) => {
+  const reason = 'Independently verified the exact displayed Stripe attempt';
+  const orders = ['full', 'partial'].map((kind, index) => ({
+    id: index + 1, number: `PREVIEW-MANUAL-${kind.toUpperCase()}`, customerName: 'Preview buyer', email: 'buyer@example.test',
+    status: 'confirmed', paymentStatus: 'refund_pending', paymentProvider: 'stripe', paymentMethod: 'card', testPayment: false,
+    refundAttempt: 1, refundAttemptIsPartial: kind === 'partial', refundOutcome: 'unknown', refundId: null,
+    refundedTotalCents: 0, refundAttemptAmountCents: kind === 'full' ? 10000 : 2500, historicalRefunds: [],
+    externalRefundUnmatched: false, paymentSessionUnconfirmed: false, paymentReconciliationRequired: false,
+    subtotal: 100, shipping: 0, total: 100, currency: 'EUR', createdAt: '2026-10-14T10:00:00Z', items: []
+  }));
+  const requests = [];
+  const targetFor = (order) => ({ orderNumber: order.number, attempt: order.refundAttempt, refundId: order.refundId,
+    kind: order.refundAttemptIsPartial ? 'partial' : 'full', amountCents: order.refundAttemptAmountCents,
+    refundedTotalCents: order.refundedTotalCents, outcome: order.refundOutcome, totalCents: 10000, currency: 'EUR' });
+  await page.route('**/api/admin/orders?*', (route) => route.fulfill({ json: {
+    data: orders, page: 1, limit: 50, total: orders.length, hasMore: false
+  } }));
+  await page.route('**/api/admin/orders/cancel', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    const input = route.request().postDataJSON();
+    const order = orders.find((candidate) => candidate.number === input.orderNumber);
+    expect(order).toBeDefined();
+    expect(input).toEqual({ orderNumber: order.number, action: 'resolve_refund', resolution: 'not_refunded',
+      reason, refundTarget: targetFor(order) });
+    requests.push(input);
+    if (order.refundAttempt === 1) {
+      order.refundAttempt = 2;
+      order.refundId = 're_newselection' + (order.refundAttemptIsPartial ? 'partial' : 'full');
+      await route.fulfill({ status: 409, json: { code: 'refund_target_stale', message: 'Mensagem bruta: seleção antiga, apenas fixture.' } });
+    } else {
+      order.refundOutcome = 'manual_not_refunded';
+      order.paymentStatus = 'paid';
+      await route.fulfill({ json: { code: 'refund_resolved_manually', message: 'Mensagem bruta: decisão registrada, apenas fixture.' } });
+    }
+  });
+  const handleDialog = async (dialog) => {
+    expect(['prompt', 'confirm']).toContain(dialog.type());
+    await dialog.accept(dialog.type() === 'prompt' ? reason : undefined);
+  };
+  page.on('dialog', handleDialog);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAs(page, /enter as administrator|entrer comme administrateur/i);
+  for (const [index, order] of orders.entries()) {
+    if (index === 1) {
+      await page.setViewportSize({ width: 1280, height: 844 });
+      await page.locator('.language-switch').getByRole('button', { name: 'FR', exact: true }).click();
+      await page.setViewportSize({ width: 320, height: 844 });
+    }
+    const row = page.locator('.admin-order-row').filter({ hasText: order.number });
+    const button = row.getByRole('button', { name: /resolve as not refunded|marquer comme non remboursé/i });
+    await expect(row).toContainText(/unknown #1/);
+    await expect(row).toContainText(/attempt amount|montant de la tentative/i);
+    await button.click();
+    await expect(page.locator('.management-notice.error')).toContainText(/No automatic retry was sent|Aucun nouvel essai automatique n’a été envoyé/i);
+    await expect(page.locator('.management-notice.error')).not.toContainText('Mensagem bruta');
+    expect(requests).toHaveLength(index * 2 + 1);
+    await expect(row).toContainText(/unknown #1/);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(row).toContainText(/unknown #2/);
+    await expect(row).toContainText(order.refundId);
+    const audit = await new AxeBuilder({ page }).include('app-admin-financial-operations').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+    expect(audit.violations).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await row.screenshot({ path: testInfo.outputPath(`manual-${index === 0 ? 'full' : 'partial'}-selection-mobile.png`) });
+    await button.click();
+    await expect(page.locator('.management-notice.success')).toContainText(/No new Stripe refund was sent|Aucun nouveau remboursement Stripe n’a été envoyé/i);
+    await expect(page.locator('.management-notice.success')).not.toContainText('Mensagem bruta');
+    await expect(row).toContainText(/manual_not_refunded #2/);
+    await expect(button).toHaveCount(0);
+    expect(requests).toHaveLength((index + 1) * 2);
+  }
+  page.off('dialog', handleDialog);
+});
+
 test('administrator reviews an external refund in an accessible mobile form without sending another refund', async ({ page }, testInfo) => {
   let reviewed = false;
   const issue = { refundId: 're_preview1', orderId: 1, orderNumber: 'PREVIEW-REFUND', paymentIntentId: 'pi_preview1',

@@ -1,5 +1,7 @@
+import type { Currency, RefundOutcome } from './payment.models';
+export type { Currency, RefundOutcome, RefundResolutionSnapshot } from './payment.models';
+
 export type Language = 'en' | 'fr';
-export type Currency = 'USD' | 'EUR';
 export type Category = 'all' | 'plants' | 'home' | 'care';
 export type ProductCategory = Exclude<Category, 'all'>;
 export type Page = 'home' | 'shop' | 'marketplace' | 'product' | 'essence' | 'favorites' | 'account' | 'seller' | 'admin' | 'checkout' | 'contact' | 'deliveries' | 'returns' | 'terms' | 'privacy';
@@ -134,7 +136,9 @@ export interface AdminOrder {
   refundAttempt: number;
   refundedTotalCents: number;
   refundAttemptIsPartial: boolean;
-  refundOutcome: 'none' | 'pending' | 'unknown' | 'definitive_failure' | 'succeeded' | 'manual_refunded' | 'manual_not_refunded';
+  refundAttemptAmountCents?: number | null;
+  refundAttemptReason?: string | null;
+  refundOutcome: RefundOutcome;
   refundErrorCode: string | null;
   refundErrorMessage: string | null;
   refundErrorHttpStatus: number | null;

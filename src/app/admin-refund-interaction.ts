@@ -1,12 +1,42 @@
-import { AdminOrder } from './storefront.models';
+import { AdminOrder, RefundResolutionSnapshot } from './storefront.models';
 
 export type AdminRefundAction = 'check_refund' | 'check_refund_history' | 'retry_refund' | 'resolve_refund';
 export type AdminOrderAction = 'cancel' | AdminRefundAction;
 export type RefundResolution = 'refunded' | 'not_refunded';
 type Localize = (english: string, french: string) => string;
-type Submit = (action: AdminOrderAction, resolution?: RefundResolution, reason?: string) => void;
+type Submit = (action: AdminOrderAction, resolution?: RefundResolution, reason?: string, target?: RefundResolutionSnapshot) => void;
+
+export function manualRefundTarget(order: AdminOrder): RefundResolutionSnapshot | null {
+  const amount = order.refundAttemptAmountCents;
+  const outcome = order.refundOutcome;
+  const totalCents = Math.round(order.total * 100);
+  if (order.paymentProvider !== 'stripe' || !Number.isSafeInteger(order.refundAttempt) || order.refundAttempt < 1
+    || !Number.isSafeInteger(order.refundedTotalCents) || order.refundedTotalCents < 0
+    || amount === undefined || (amount !== null && (!Number.isSafeInteger(amount) || amount < 1))
+    || (order.refundId !== null && (typeof order.refundId !== 'string' || !/^re_[A-Za-z0-9_]+$/.test(order.refundId)))
+    || (outcome !== 'pending' && outcome !== 'unknown' && outcome !== 'definitive_failure')
+    || !Number.isSafeInteger(totalCents) || totalCents < 1 || !['EUR', 'USD'].includes(order.currency)) return null;
+  if (order.refundAttemptIsPartial) {
+    if (order.paymentStatus !== 'refund_pending' || amount === null || order.refundOutcome === 'definitive_failure') return null;
+  } else if (!['confirmed', 'preparing', 'cancelled'].includes(order.status)
+    || !['refund_pending', 'paid', 'partially_refunded'].includes(order.paymentStatus)) return null;
+  return Object.freeze({ orderNumber: order.number, attempt: order.refundAttempt, refundId: order.refundId,
+    kind: order.refundAttemptIsPartial ? 'partial' : 'full', amountCents: amount, refundedTotalCents: order.refundedTotalCents,
+    outcome, totalCents, currency: order.currency });
+}
+
+export function adminRefundSelectionError(payload: unknown, copy: Localize): string | null {
+  if (typeof payload !== 'object' || payload === null || !('code' in payload)) return null;
+  if (payload.code !== 'refund_target_stale' && payload.code !== 'refund_target_required') return null;
+  return copy('The refund selection or balance changed. Refresh the orders and independently verify the displayed attempt before another manual decision. No automatic retry was sent.',
+    'La tentative ou le solde a changé. Actualisez les commandes et vérifiez indépendamment la tentative affichée avant toute nouvelle décision manuelle. Aucun nouvel essai automatique n’a été envoyé.');
+}
 
 export function adminRefundResultMessage(result: { message: string; code?: string }, copy: Localize): string {
+  if (result.code === 'refund_resolved_manually') {
+    return copy('The independently verified manual refund decision was recorded. No new Stripe refund was sent. Review the refreshed balance and fulfillment status.',
+      'La décision manuelle vérifiée indépendamment a été enregistrée. Aucun nouveau remboursement Stripe n’a été envoyé. Vérifiez le solde et l’état de livraison actualisés.');
+  }
   if (result.code === 'refund_history_checked') {
     return copy('Stripe refund history was checked without sending a new refund. Review the refreshed balance and any attempt still pending.',
       'L’historique Stripe a été vérifié sans envoyer de nouveau remboursement. Vérifiez le solde actualisé et toute tentative encore en attente.');
@@ -69,6 +99,11 @@ export function handleAdminRefundInteraction(
     return;
   }
   if (!resolution) return;
+  const target = manualRefundTarget(order);
+  if (!target) {
+    showError('Refresh the order: this refund is not eligible for a manual decision with the displayed details.', 'Actualisez la commande : les détails affichés ne permettent pas de décision manuelle pour ce remboursement.');
+    return;
+  }
 
   const reason = window.prompt(copy(
     `Record why you are resolving this as ${resolution === 'refunded' ? 'refunded' : 'not refunded'} (at least 10 characters):`,
@@ -82,5 +117,5 @@ export function handleAdminRefundInteraction(
   const confirmation = resolution === 'refunded'
     ? copy('Confirm only if you independently verified that the customer was refunded. The order will be cancelled and its stock released if needed.', 'Confirmez uniquement après avoir vérifié que le client a été remboursé. La commande sera annulée et son stock libéré si nécessaire.')
     : copy('Confirm only after checking Stripe and verifying no refund was issued. Otherwise a later retry could send a duplicate refund. The payment will remain due.', 'Confirmez uniquement après avoir vérifié dans Stripe qu’aucun remboursement n’a été émis. Sinon, une nouvelle tentative pourrait créer un remboursement en double. Le paiement restera dû.');
-  if (window.confirm(confirmation)) submit(action, resolution, reason.trim());
+  if (window.confirm(confirmation)) submit(action, resolution, reason.trim(), target);
 }

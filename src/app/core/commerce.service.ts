@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { AccountProfile, AdminAuditEntry, AdminContactMessage, AdminOrder, AdminOverviewPage, AdminPaymentDispute, AdminPaymentNotification, AdminProduct, AdminReview, AdminSeller, AdminUser, AdminWithdrawalRequest, AuthUser, ContactMessageInput, ManagedProduct, MarketplaceStore, OrderSummary, ProductReviewResponse, ShippingQuoteResponse } from '../storefront.models';
 import { AuthService } from './auth.service';
 import type { ExternalRefundIssue } from '../storefront.models';
+import type { RefundResolutionSnapshot } from '../storefront.models';
 
 @Injectable({ providedIn: 'root' })
 export class CommerceService {
@@ -169,13 +170,15 @@ export class CommerceService {
     orderNumber: string,
     action: 'cancel' | 'check_refund' | 'check_refund_history' | 'retry_refund' | 'resolve_refund' | 'resolve_checkout_attempt' = 'cancel',
     resolution?: 'refunded' | 'not_refunded',
-    reason?: string
+    reason?: string,
+    target?: RefundResolutionSnapshot
   ): Observable<{ message: string; code?: string }> {
     return this.auth.postWithCsrf<{ message: string; code?: string }>('/api/admin/orders/cancel', {
       orderNumber,
       action,
       ...(resolution ? { resolution } : {}),
-      ...(reason ? { reason } : {})
+      ...(reason ? { reason } : {}),
+      ...(action === 'resolve_refund' && target ? { refundTarget: target } : {})
     });
   }
 

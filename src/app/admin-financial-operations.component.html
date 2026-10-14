@@ -93,6 +93,10 @@
       <div>
         <strong>{{ order.number }}</strong>
         <small>{{ order.customerName }} · {{ order.email }}</small>
+        @if (order.paymentProvider === 'stripe' && order.refundAttempt > 0) {
+          <small class="refund-history-reference">{{ copy('Current refund attempt', 'Tentative de remboursement actuelle') }} #{{ order.refundAttempt }} · {{ order.refundAttemptIsPartial ? copy('Partial', 'Partiel') : copy('Full balance', 'Solde intégral') }} · {{ order.refundId || copy('Provider reference not yet known', 'Référence du prestataire encore inconnue') }}</small>
+          <small>{{ copy('Attempt amount:', 'Montant de la tentative :') }} @if (order.refundAttemptAmountCents != null) { {{ priceFormatter(order.refundAttemptAmountCents! / 100, order.currency) }} } @else { {{ copy('Legacy amount not recorded; independently verify the remaining balance.', 'Montant ancien non enregistré ; vérifiez indépendamment le solde restant.') }} }</small>
+        }
         @if (order.refundErrorCode) {
           <small class="admin-warning" role="note"><b>{{ copy('Refund issue', 'Problème de remboursement') }}: {{ order.refundErrorCode }}@if (order.refundErrorHttpStatus) { · HTTP {{ order.refundErrorHttpStatus }} }</b> {{ order.refundErrorMessage }}</small>
         }
@@ -133,8 +137,10 @@
           @if (!order.historicalRefunds?.length && !order.externalRefundUnmatched && !order.refundAttemptIsPartial && ['paid', 'partially_refunded'].includes(order.paymentStatus) && ['definitive_failure', 'manual_not_refunded'].includes(order.refundOutcome)) {
             <button class="danger-link" type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'retry_refund' })">{{ copy('Retry refund', 'Réessayer le remboursement') }}</button>
           }
-          <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'refunded' })">{{ copy('Resolve as refunded', 'Marquer comme remboursé') }}</button>
-          <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'not_refunded' })">{{ copy('Resolve as not refunded', 'Marquer comme non remboursé') }}</button>
+          @if (canResolveRefund(order)) {
+            <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'refunded' })">{{ copy('Resolve as refunded', 'Marquer comme remboursé') }}</button>
+            <button type="button" [disabled]="loading" (click)="refundOrderAction.emit({ order, action: 'resolve_refund', resolution: 'not_refunded' })">{{ copy('Resolve as not refunded', 'Marquer comme non remboursé') }}</button>
+          }
         }
         @if (!order.historicalRefunds?.length && !order.externalRefundUnmatched && order.paymentProvider === 'stripe' && ['paid', 'partially_refunded'].includes(order.paymentStatus)) {
           <button type="button" [disabled]="loading" (click)="partialRefund.emit(order)">{{ copy('Partial refund', 'Remboursement partiel') }}</button>

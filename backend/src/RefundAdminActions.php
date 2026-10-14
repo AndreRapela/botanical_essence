@@ -406,7 +406,7 @@ trait RefundAdminActions
         }
     }
 
-    private function resolveAdminRefund(array $order, int $adminId, string $resolution, string $reason): array
+    private function resolveAdminRefund(array $order, int $adminId, string $resolution, string $reason, RefundResolutionTarget $target): array
     {
         if ($order['payment_provider'] !== 'stripe'
             || !in_array($order['payment_status'], ['refund_pending', 'paid', 'partially_refunded'], true)
@@ -417,7 +417,7 @@ trait RefundAdminActions
 
         $this->pdo->beginTransaction();
         try {
-            $select = $this->pdo->prepare('SELECT status, payment_status, payment_refund_outcome, payment_refund_attempt, payment_refunded_cents, total, currency FROM orders WHERE id = :id FOR UPDATE');
+            $select = $this->pdo->prepare('SELECT * FROM orders WHERE id = :id FOR UPDATE');
             $select->execute([':id' => $order['id']]);
             $current = $select->fetch();
             if (!$current || !in_array($current['payment_status'], ['refund_pending', 'paid', 'partially_refunded'], true)
@@ -429,6 +429,7 @@ trait RefundAdminActions
             $attemptLock = $this->pdo->prepare('SELECT * FROM payment_refund_attempts WHERE order_id = :orderId AND attempt = :attempt LIMIT 1 FOR UPDATE');
             $attemptLock->execute([':orderId' => $order['id'], ':attempt' => $current['payment_refund_attempt']]);
             $refundAttempt = $attemptLock->fetch();
+            $target->assertMatches($this->pdo, $current, $refundAttempt ?: null);
             if ($refundAttempt && ($refundAttempt['attempt_kind'] ?? 'partial') !== 'full') {
                 throw new HttpException('Esta tentativa é parcial e precisa ser resolvida pelo fluxo de reembolsos parciais.', 409);
             }
@@ -517,7 +518,7 @@ trait RefundAdminActions
                 ':new' => $newStatus . ':' . $newPaymentStatus . ':' . $outcome . '; attempt=' . $current['payment_refund_attempt'] . '; reason=' . $reason,
             ]);
             $this->pdo->commit();
-            return ['message' => $resolution === 'refunded'
+            return ['code' => 'refund_resolved_manually', 'message' => $resolution === 'refunded'
                 ? 'Resolução manual registrada como reembolsado; pedido cancelado e estoque liberado uma única vez.'
                 : 'Resolução manual registrada como não reembolsado; o pagamento segue pago e pode receber nova tentativa.'];
         } catch (Throwable $exception) {

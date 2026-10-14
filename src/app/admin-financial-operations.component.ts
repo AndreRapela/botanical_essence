@@ -4,6 +4,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { AdminOrder, AdminWithdrawalRequest, Currency, Language } from './storefront.models';
 import { adminOrderItems, adminOrderRefundRemaining, withdrawalStatusText } from './order.view';
 import type { AdminRefundAction } from './admin-refund-interaction';
+import { manualRefundTarget } from './admin-refund-interaction';
 
 export type AdminWithdrawalAction = 'review' | 'send_instructions' | 'mark_received' | 'not_eligible' | 'refund' | 'check_refund' | 'retry_refund';
 export type { AdminRefundAction } from './admin-refund-interaction';
@@ -51,6 +52,8 @@ export class AdminFinancialOperationsComponent {
   adminOrderRefundRemaining(order: AdminOrder): number {
     return adminOrderRefundRemaining(order);
   }
+
+  canResolveRefund(order: AdminOrder): boolean { return manualRefundTarget(order) !== null; }
 
   withdrawalStatusLabel(status: string | null | undefined): string {
     return withdrawalStatusText(status, this.language);

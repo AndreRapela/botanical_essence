@@ -3,7 +3,8 @@ import type { ChangeDetectorRef, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, forkJoin, takeUntil } from 'rxjs';
 
-import { adminRefundResultMessage, confirmAdminOrderCancellation, handleAdminRefundInteraction } from './admin-refund-interaction';
+import { adminRefundResultMessage, adminRefundSelectionError, confirmAdminOrderCancellation, handleAdminRefundInteraction, manualRefundTarget } from './admin-refund-interaction';
+import type { RefundResolutionSnapshot } from './storefront.models';
 import type { AdminOrderAction, AdminRefundAction, RefundResolution } from './admin-refund-interaction';
 import type { CommerceService } from './core/commerce.service';
 import type { AuthService } from './core/auth.service';
@@ -72,7 +73,7 @@ export interface AdminOrdersActionsContext {
   copy(english: string, french: string): string;
   formatPrice(value: number, currency: Currency): string;
   loadAdminSellers(): void;
-  runAdminOrderAction(order: AdminOrder, action: AdminOrderActionName, resolution?: RefundResolution, reason?: string): void;
+  runAdminOrderAction(order: AdminOrder, action: AdminOrderActionName, resolution?: RefundResolution, reason?: string, target?: RefundResolutionSnapshot): void;
 }
 
 export function loadAdminSellers(this: AdminOrdersActionsContext): void {
@@ -226,6 +227,8 @@ export function resolveUnattachedCheckoutAttempt(this: AdminOrdersActionsContext
 export function adminRefundAction(this: AdminOrdersActionsContext, order: AdminOrder, action: AdminRefundAction, resolution?: RefundResolution): void {
     if (order.refundAttemptIsPartial && action === 'resolve_refund' && resolution) {
       if (this.adminLoading) return;
+      const target = manualRefundTarget(order);
+      if (!target) { this.adminError = this.copy('Refresh this order before a manual refund decision.', 'Actualisez cette commande avant toute décision manuelle de remboursement.'); return; }
       const reason = window.prompt(this.copy(
         `Only resolve after independently checking the Stripe refund. Explain why attempt #${order.refundAttempt} is being recorded as ${resolution} (10–500 characters):`,
         `Ne résolvez qu’après vérification indépendante du remboursement Stripe. Expliquez pourquoi la tentative #${order.refundAttempt} est marquée ${resolution === 'refunded' ? 'remboursée' : 'non remboursée'} (10 à 500 caractères) :`
@@ -239,7 +242,7 @@ export function adminRefundAction(this: AdminOrdersActionsContext, order: AdminO
           ? 'Confirmez que le montant exact du remboursement partiel a bien été émis. Le solde remboursé sera augmenté.'
           : 'Confirmez que Stripe n’a pas émis ce remboursement. Toute nouvelle tentative doit éviter un doublon.'
       ))) return;
-      this.runAdminOrderAction(order, action, resolution, reason);
+      this.runAdminOrderAction(order, action, resolution, reason, target);
       return;
     }
     handleAdminRefundInteraction(
@@ -247,18 +250,21 @@ export function adminRefundAction(this: AdminOrdersActionsContext, order: AdminO
       action,
       resolution,
       (english, french) => this.copy(english, french),
-      (selectedAction, selectedResolution, reason) => this.runAdminOrderAction(order, selectedAction, selectedResolution, reason),
+      (selectedAction, selectedResolution, reason, target) => this.runAdminOrderAction(order, selectedAction, selectedResolution, reason, target),
       (english, french) => { this.adminError = this.copy(english, french); },
       this.adminLoading
     );
   }
 
-export function runAdminOrderAction(this: AdminOrdersActionsContext, order: AdminOrder, action: AdminOrderActionName, resolution?: RefundResolution, reason?: string): void {
+export function runAdminOrderAction(this: AdminOrdersActionsContext, order: AdminOrder, action: AdminOrderActionName, resolution?: RefundResolution, reason?: string, target?: RefundResolutionSnapshot): void {
+    if (action === 'resolve_refund' && !target) { this.adminError = this.copy('Refresh and select the refund attempt before a manual decision.', 'Actualisez et sélectionnez la tentative avant toute décision manuelle.'); return; }
     this.adminLoading = true;
     const sessionVersion = this.auth.sessionVersion;
     this.adminError = '';
     this.adminSuccess = '';
-    this.commerce.cancelAdminOrder(order.number, action, resolution, reason).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.cdr.markForCheck())).subscribe({
+    const request = target ? this.commerce.cancelAdminOrder(order.number, action, resolution, reason, target)
+      : this.commerce.cancelAdminOrder(order.number, action, resolution, reason);
+    request.pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.cdr.markForCheck())).subscribe({
       next: (result) => {
         if (sessionVersion !== this.auth.sessionVersion) return;
         this.adminLoading = false;
@@ -269,7 +275,8 @@ export function runAdminOrderAction(this: AdminOrdersActionsContext, order: Admi
         if (sessionVersion !== this.auth.sessionVersion) return;
         this.adminLoading = false;
         this.handleUnauthorized(error, sessionVersion);
-        this.adminError = this.apiError(error, this.copy('We could not update this refund. Review the order and Stripe status before retrying.', 'Impossible de mettre à jour ce remboursement. Vérifiez la commande et son état Stripe avant de réessayer.'));
+        this.adminError = adminRefundSelectionError(error.error, (english, french) => this.copy(english, french))
+          ?? this.apiError(error, this.copy('We could not update this refund. Review the order and Stripe status before retrying.', 'Impossible de mettre à jour ce remboursement. Vérifiez la commande et son état Stripe avant de réessayer.'));
       }
     });
   }

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminOrder } from './storefront.models';
-import { adminRefundResultMessage, confirmAdminOrderCancellation, handleAdminRefundInteraction } from './admin-refund-interaction';
-import { partialRefundAdminOrder, type AdminOrdersActionsContext } from './admin-orders.actions';
+import { adminRefundResultMessage, adminRefundSelectionError, confirmAdminOrderCancellation, handleAdminRefundInteraction, manualRefundTarget } from './admin-refund-interaction';
+import { adminRefundAction, partialRefundAdminOrder, runAdminOrderAction, type AdminOrdersActionsContext } from './admin-orders.actions';
 
 function makeOrder(values: Partial<AdminOrder> = {}): AdminOrder {
   return {
@@ -14,6 +14,8 @@ function makeOrder(values: Partial<AdminOrder> = {}): AdminOrder {
     refundOutcome: 'unknown',
     refundAttempt: 1,
     refundAttemptIsPartial: false,
+    refundId: null,
+    refundAttemptAmountCents: 1000,
     total: 10,
     refundedTotalCents: 0,
     currency: 'EUR',
@@ -150,7 +152,7 @@ describe('admin refund interaction safeguards', () => {
     handleAdminRefundInteraction(makeOrder({ paymentStatus: 'paid', refundOutcome: 'definitive_failure' }), 'retry_refund', undefined, frenchCopy, submit, vi.fn(), false);
     expect(confirm).toHaveBeenNthCalledWith(1, expect.stringContaining('Stripe a définitivement refusé'));
 
-    handleAdminRefundInteraction(makeOrder(), 'resolve_refund', 'refunded', frenchCopy, submit, vi.fn(), false);
+    handleAdminRefundInteraction(makeOrder({ paymentStatus: 'refund_pending' }), 'resolve_refund', 'refunded', frenchCopy, submit, vi.fn(), false);
     expect(prompt).toHaveBeenCalledWith(expect.stringContaining('Indiquez pourquoi'));
     expect(prompt).toHaveBeenCalledWith(expect.not.stringContaining('Registre'));
   });
@@ -162,18 +164,18 @@ describe('admin refund interaction safeguards', () => {
     const confirm = vi.spyOn(window, 'confirm');
 
     prompt.mockReturnValueOnce(null);
-    handleAdminRefundInteraction(makeOrder(), 'resolve_refund', 'refunded', copy, submit, showError, false);
+    handleAdminRefundInteraction(makeOrder({ paymentStatus: 'refund_pending' }), 'resolve_refund', 'refunded', copy, submit, showError, false);
     expect(submit).not.toHaveBeenCalled();
 
     prompt.mockReturnValueOnce('too short');
-    handleAdminRefundInteraction(makeOrder(), 'resolve_refund', 'not_refunded', copy, submit, showError, false);
+    handleAdminRefundInteraction(makeOrder({ paymentStatus: 'refund_pending' }), 'resolve_refund', 'not_refunded', copy, submit, showError, false);
     expect(showError).toHaveBeenCalledWith('Enter a reason between 10 and 500 characters.', expect.any(String));
 
     showError.mockClear();
     prompt.mockReturnValueOnce('  Checked the provider records  ');
     confirm.mockReturnValueOnce(true);
-    handleAdminRefundInteraction(makeOrder(), 'resolve_refund', 'refunded', copy, submit, showError, false);
-    expect(submit).toHaveBeenCalledWith('resolve_refund', 'refunded', 'Checked the provider records');
+    handleAdminRefundInteraction(makeOrder({ paymentStatus: 'refund_pending' }), 'resolve_refund', 'refunded', copy, submit, showError, false);
+    expect(submit).toHaveBeenCalledWith('resolve_refund', 'refunded', 'Checked the provider records', manualRefundTarget(makeOrder({ paymentStatus: 'refund_pending' })));
     expect(showError).not.toHaveBeenCalled();
   });
 
@@ -208,5 +210,80 @@ describe('admin refund interaction safeguards', () => {
     submit.mockClear(); confirm.mockClear();
     handleAdminRefundInteraction({ ...order, refundOutcome: 'unknown' }, 'retry_refund', undefined, copy, submit, vi.fn(), false);
     expect(submit).not.toHaveBeenCalled(); expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('immutable manual refund selection', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('captures the exact order, attempt, reference, amount, balance and outcome in an immutable snapshot', () => {
+    const order = makeOrder({ paymentStatus: 'refund_pending', refundId: 're_selected1' });
+    const target = manualRefundTarget(order);
+    expect(target).toEqual({ orderNumber: order.number, attempt: 1, refundId: 're_selected1', kind: 'full',
+      amountCents: 1000, refundedTotalCents: 0, outcome: 'unknown', totalCents: 1000, currency: 'EUR' });
+    expect(Object.isFrozen(target)).toBe(true);
+    order.refundAttempt = 2; order.refundId = 're_new2'; order.refundedTotalCents = 500;
+    expect(target?.attempt).toBe(1);
+    expect(target?.refundId).toBe('re_selected1');
+    expect(target?.refundedTotalCents).toBe(0);
+  });
+
+  it('refuses missing, malformed, settled or ineligible selections and permits only explicit legacy full amounts', () => {
+    const base = makeOrder({ paymentStatus: 'refund_pending' });
+    for (const changes of [{ refundAttemptAmountCents: undefined }, { refundAttemptAmountCents: 0 },
+      { refundAttemptAmountCents: 1.5 }, { refundId: 'unbound-reference' }, { refundAttempt: 0 },
+      { refundedTotalCents: -1 }, { refundOutcome: 'succeeded' as const }, { status: 'delivered' },
+      { paymentProvider: 'local_test' }, { refundAttemptIsPartial: true, refundAttemptAmountCents: null },
+      { refundAttemptIsPartial: true, paymentStatus: 'paid' }]) {
+      expect(manualRefundTarget({ ...base, ...changes })).toBeNull();
+    }
+    expect(manualRefundTarget({ ...base, refundAttemptAmountCents: null })?.amountCents).toBeNull();
+  });
+
+  it('submits the pre-confirmation full selection even if the displayed object changes during the prompt', () => {
+    const order = makeOrder({ paymentStatus: 'refund_pending' });
+    const original = manualRefundTarget(order);
+    const submit = vi.fn();
+    vi.spyOn(window, 'prompt').mockImplementation(() => {
+      order.number = 'BE-OTHER-ORDER'; order.refundAttempt = 2;
+      order.refundAttemptAmountCents = 500; order.refundedTotalCents = 500;
+      return 'Verified the originally displayed attempt';
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    handleAdminRefundInteraction(order, 'resolve_refund', 'not_refunded', copy, submit, vi.fn(), false);
+    expect(submit).toHaveBeenCalledExactlyOnceWith('resolve_refund', 'not_refunded',
+      'Verified the originally displayed attempt', original);
+  });
+
+  it('captures the partial selection before its confirmation rather than rebuilding it from a changed object', () => {
+    const order = makeOrder({ paymentStatus: 'refund_pending', refundAttemptIsPartial: true, refundAttemptAmountCents: 500 });
+    const target = manualRefundTarget(order);
+    const run = vi.fn();
+    const context = { adminLoading: false, adminError: '', copy, runAdminOrderAction: run } as unknown as AdminOrdersActionsContext;
+    vi.spyOn(window, 'prompt').mockImplementation(() => { order.refundAttempt = 3; return 'Verified the selected partial refund'; });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    adminRefundAction.call(context, order, 'resolve_refund', 'not_refunded');
+    expect(run).toHaveBeenCalledExactlyOnceWith(order, 'resolve_refund', 'not_refunded', 'Verified the selected partial refund', target);
+  });
+
+  it('localizes stale selection errors and never renders the raw provider/API message', () => {
+    const payload = { code: 'refund_target_stale', message: 'Mensagem crua não deve aparecer' };
+    expect(adminRefundSelectionError(payload, copy)).toContain('Refresh the orders');
+    expect(adminRefundSelectionError(payload, frenchCopy)).toContain('Actualisez les commandes');
+    expect(adminRefundSelectionError(payload, copy)).not.toContain(payload.message);
+    expect(adminRefundSelectionError({ code: 'refund_target_required' }, copy)).toContain('No automatic retry');
+    expect(adminRefundSelectionError(null, copy)).toBeNull();
+    expect(adminRefundSelectionError({ code: 'other' }, copy)).toBeNull();
+    expect(adminRefundResultMessage({ code: 'refund_resolved_manually', message: payload.message }, copy)).toContain('No new Stripe refund');
+    expect(adminRefundResultMessage({ code: 'refund_resolved_manually', message: payload.message }, frenchCopy)).toContain('Aucun nouveau remboursement');
+  });
+
+  it('refuses dispatch without an already captured selection instead of inventing one at submit time', () => {
+    const cancel = vi.fn();
+    const context = { adminLoading: false, adminError: '', copy, commerce: { cancelAdminOrder: cancel } } as unknown as AdminOrdersActionsContext;
+    runAdminOrderAction.call(context, makeOrder({ paymentStatus: 'refund_pending' }), 'resolve_refund', 'refunded', 'A verified manual reason');
+    expect(cancel).not.toHaveBeenCalled();
+    expect(context.adminLoading).toBe(false);
+    expect(context.adminError).toContain('select the refund attempt');
   });
 });
