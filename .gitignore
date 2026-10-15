@@ -18,6 +18,7 @@
 *.dump
 *.bak
 *.backup
+*.bdbk
 *.pem
 *.p12
 *.pfx

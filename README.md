@@ -2,6 +2,27 @@
 
 Loja botânica responsiva com catálogo próprio e marketplace. O projeto usa Angular no frontend, uma API PHP modular, MySQL e Nginx.
 
+## Troca de computador e publicação
+
+A preferência de entrega está registrada em [`AGENTS.md`](AGENTS.md): finalizar alterações validadas com **commit e push**, sem deploy. A solicitação inicial de deploy foi retirada pelo usuário em 15/10/2026. O arquivo de instruções acompanha o clone do projeto, seguindo a orientação do [OpenAI Docs sobre instruções por repositório](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+
+Na conferência de 15/10/2026, antes desta documentação, o código local e `origin/main` coincidiam em `71c89d2dbadf74d586ac27bc768be1de882879e2`, sem alterações de código ou arquivos não ignorados pendentes. Os assets em `src/assets/` já estavam versionados. Publicar código não copia banco, arquivos ignorados ou configurações privadas.
+
+| Item local | Como preservar para outro computador |
+| --- | --- |
+| Código, assets, testes, scripts e arquivos de dependências lockados | Estão no Git; clonar o repositório. |
+| `.env` | Não enviar ao Git. Recriar a partir de `.env.example` e recuperar os valores por um cofre/canal privado autorizado. Nunca substituir o arquivo existente sem conferir os valores necessários. |
+| Banco MySQL persistente no volume `botanicalessence_botanical_mysql` | Não está no Git. Exige backup cifrado com restauração verificada, chave guardada separadamente e destino aprovado. Ver “Backup e validação de restauração do MySQL”. Não copiar uma pasta de volume ativa nem importar dados de teste sobre uma base real. |
+| `backend/storage/mail.log` | Não publicar: pode conter dados pessoais e links de autenticação de uso único. Não é necessário ao funcionamento no outro PC; se precisar do histórico, preservar somente por canal privado protegido. |
+| `backend/storage/payment-worker-heartbeat` | Estado temporário local; deve ser recriado pelo worker, não transferido como prova de saúde. |
+| `node_modules/`, `backend/vendor/`, `.angular/`, `dist/` | Dependências/cache/build reproduzíveis; reinstalar/reconstruir com os arquivos lockados e Dockerfiles do projeto. |
+| `coverage/`, `test-results/`, `.codex-screens/`, `backend/storage-e2e/` | Artefatos locais de teste/diagnóstico. Não publicar nem usar como dados operacionais; gerar novamente quando necessário. |
+| Backups, dumps e chaves | Nunca commitar. Preservar backups cifrados em armazenamento privado aprovado, com a chave separada. A extensão de backup `.bdbk` também está ignorada. |
+
+No outro computador, clone [AndreRapela/botanical_essence](https://github.com/AndreRapela/botanical_essence), recupere a configuração privada e, se for necessário manter os dados, restaure o backup **em uma base isolada primeiro**. Só então prepare a execução do projeto. Não apague ou formate o computador antigo contando apenas com o clone: ele não recupera o banco nem o `.env`.
+
+O workflow `quality.yml` executa CI, não deploy. Na consulta de 15/10/2026, a [execução do commit `71c89d2`](https://github.com/AndreRapela/botanical_essence/actions/runs/38515879588) havia falhado em `Start isolated application stack`; o job Windows de ACL passou. Essa falha não foi diagnosticada pelos metadados públicos e não é declarada resolvida por este registro. Os testes locais anteriores estão documentados em `SECURITY_AUDIT.md`.
+
 ## O que está implementado
 
 - Catálogo e vendedores carregados da API, com paginação e seletor global de preços em USD ou EUR.
