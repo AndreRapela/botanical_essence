@@ -1,0 +1,24 @@
+# Public, sanitized examples only. Use a NEW Compose project/empty volume:
+# docker compose -p botanicalessence-public-demo -f docker-compose.yml -f docker-compose.demo-data.yml up -d --build
+# Never replace or delete an existing database volume to load this snapshot.
+name: botanicalessence-public-demo
+
+x-demo-environment: &demo-environment
+  APP_ENV: development
+  ENABLE_DEMO_ACCOUNTS: "true"
+  MAIL_TRANSPORT: log
+  PAYMENT_EXECUTION_MODE: local_simulation
+  PAYMENT_TEST_MODE: "true"
+  STRIPE_SECRET_KEY: ""
+  STRIPE_WEBHOOK_SECRET: ""
+  STRIPE_ACCOUNT_ID: ""
+
+services:
+  mysql:
+    image: andrerapela/botanical_essence:database-demo-20261016-317cb51@sha256:b8ea321b367a424e5b70bcb150ebfbe31978a2dbb467b1f59fd4586e6535644c
+    environment:
+      APP_ENV: development
+  backend:
+    environment: *demo-environment
+  payment-operations:
+    environment: *demo-environment

@@ -21,6 +21,23 @@ Na conferência de 15/10/2026, antes desta documentação, o código local e `or
 
 No outro computador, clone [AndreRapela/botanical_essence](https://github.com/AndreRapela/botanical_essence), recupere a configuração privada e, se for necessário manter os dados, restaure o backup **em uma base isolada primeiro**. Só então prepare a execução do projeto. Não apague ou formate o computador antigo contando apenas com o clone: ele não recupera o banco nem o `.env`.
 
+### Banco público de demonstração
+
+Em 16/10/2026 o usuário confirmou que a base local contém apenas exemplos e autorizou sua publicação pública, sem criptografia. A imagem `andrerapela/botanical_essence:database-demo-20261016-317cb51` contém uma cópia sanitizada desses exemplos, **não um backup fiel nem uma base de produção**. A imagem preserva o esquema, catálogo, perfis e histórico demonstrativo; remove senhas antigas, tokens, histórico de rate limit/auditoria e anonimiza contas e contatos dos pedidos. A entrega de notificações existentes fica desativada. O volume original não é alterado, e `.env`, credenciais do MySQL, chaves Stripe e arquivos privados não fazem parte da imagem.
+
+O snapshot publicado tem 22 tabelas, incluindo 8 contas, 6 lojas/vendedores, 7 produtos, 7 avaliações e 1 pedido de exemplo. A inicialização da imagem foi testada em MySQL descartável com rede desabilitada e dados em memória: contagens conferidas, `CHECK TABLE` aprovado nas 22 tabelas e acesso com credenciais novas verificado. O Compose fixa o digest `sha256:b8ea321b367a424e5b70bcb150ebfbe31978a2dbb467b1f59fd4586e6535644c`; o SQL embarcado tem SHA-256 `ea1d616550f6683eefb77d96f181aaa718d26cc89374707622fbb424feba64d9`. A imagem é `linux/amd64` e não é atualizada por novos commits ou alterações locais do banco.
+
+No novo computador, prepare uma configuração local a partir de `.env.example`, com senhas novas, fortes e diferentes para `DB_PASSWORD` e `DB_ROOT_PASSWORD`. Para os exemplos, mantenha `APP_ENV=development`, `ENABLE_DEMO_ACCOUNTS=true`, `MAIL_TRANSPORT=log`, `PAYMENT_EXECUTION_MODE=local_simulation`, `PAYMENT_TEST_MODE=true` e as credenciais Stripe vazias. Não reutilize uma configuração de produção. Então, na raiz do clone:
+
+```powershell
+docker compose --env-file .env -p botanicalessence-public-demo -f docker-compose.yml -f docker-compose.demo-data.yml pull mysql
+docker compose --env-file .env -p botanicalessence-public-demo -f docker-compose.yml -f docker-compose.demo-data.yml up -d --build
+```
+
+O nome de projeto separado cria o volume `botanicalessence-public-demo_botanical_mysql`, sem reutilizar o volume original `botanicalessence_botanical_mysql`. Se as portas locais já estiverem ocupadas, configure `FRONTEND_PORT`, `BACKEND_PORT` e `MYSQL_PORT` antes de iniciar. A imagem importa o snapshot **somente ao inicializar um volume vazio**; não sobrepõe uma base existente e não recebe novas alterações automaticamente. Não apague um volume para atualizar os exemplos. Os logins de senha antigos não são transferidos: use os botões de demonstração em desenvolvimento ou cadastre uma nova conta. As migrações do backend ocorrerão apenas nessa nova base demonstrativa ao iniciar o projeto; este procedimento não autoriza migrar a base original.
+
+O Compose adicional e a imagem são apenas para demonstração: o arquivo força desenvolvimento, simulação local, e-mails em log e credenciais Stripe vazias no backend/worker, mesmo se o `.env` definir outros valores. Para dados reais, permanece obrigatório um backup privado com restauração de prova. O comportamento de inicialização é o da [imagem oficial MySQL](https://hub.docker.com/_/mysql); o isolamento por nome segue a [documentação do Docker Compose](https://docs.docker.com/compose/how-tos/project-name/).
+
 O workflow `quality.yml` executa CI, não deploy. Na consulta de 15/10/2026, a [execução do commit `71c89d2`](https://github.com/AndreRapela/botanical_essence/actions/runs/38515879588) havia falhado em `Start isolated application stack`; o job Windows de ACL passou. Essa falha não foi diagnosticada pelos metadados públicos e não é declarada resolvida por este registro. Os testes locais anteriores estão documentados em `SECURITY_AUDIT.md`.
 
 ## O que está implementado
