@@ -59,7 +59,38 @@ O workflow `quality.yml` executa CI, não deploy. Na consulta de 15/10/2026, a [
 
 Em desenvolvimento, a tela de login oferece acesso em um clique a contas de administrador, usuário e vendedor. Nenhuma senha é enviada ao navegador. As contas são marcadas no banco, protegidas contra edição administrativa e automaticamente desativadas — junto com seus anúncios — quando `APP_ENV` deixa de ser `development` ou `ENABLE_DEMO_ACCOUNTS` não está ativo. Contas antigas de catálogo continuam sem senha e desativadas para login.
 
-## Executar com Docker
+## Iniciar localmente com as imagens do Docker Hub
+
+Para executar a versão já publicada, use Docker Desktop com containers Linux e Docker Compose atualizado. Não é necessário instalar Node, npm, PHP, Composer ou MySQL no computador. O comando `docker push andrerapela/botanical_essence:tagname` é um exemplo de envio: `tagname` não é uma tag publicada. Para baixar e iniciar, use o Compose abaixo.
+
+As imagens disponíveis são `frontend-317cb51`, `backend-317cb51` (também usada pelo worker) e `database-demo-20261016-317cb51`. O arquivo `docker-compose.hub.yml` fixa os digests do frontend/backend e remove a etapa de build, usando as [regras de merge do Compose](https://docs.docker.com/reference/compose-file/merge/). O banco e as configurações de demonstração vêm de `docker-compose.demo-data.yml`.
+
+Na raiz do clone, prepare o ambiente local **sem sobrescrever um `.env` existente**:
+
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+New-Item -ItemType Directory -Force backend/storage/public-demo | Out-Null
+```
+
+Antes de continuar, confira o `.env`: use os valores locais de `.env.example`, portas disponíveis e senhas novas, aleatórias e diferentes de pelo menos 32 caracteres em `DB_PASSWORD` e `DB_ROOT_PASSWORD`. Nunca use credenciais de produção. Depois:
+
+```powershell
+docker compose --env-file .env -p botanicalessence-public-demo -f docker-compose.yml -f docker-compose.demo-data.yml -f docker-compose.hub.yml config --quiet
+docker compose --env-file .env -p botanicalessence-public-demo -f docker-compose.yml -f docker-compose.demo-data.yml -f docker-compose.hub.yml pull
+docker compose --env-file .env -p botanicalessence-public-demo -f docker-compose.yml -f docker-compose.demo-data.yml -f docker-compose.hub.yml up -d --no-build --wait --wait-timeout 240
+```
+
+Com as portas padrão, abra [o site local](http://localhost:4300) e [a saúde da API](http://localhost:8180/api/health). Na tela de login, use os acessos de demonstração de administrador, usuário ou vendedor. Pagamentos são simulados e e-mails ficam em log local. Esse modo usa apenas o snapshot público sanitizado descrito em “Banco público de demonstração”; não recupera dados privados do outro computador.
+
+Os dados ficam no volume `botanicalessence-public-demo_botanical_mysql`, separado do banco original. Logs e heartbeat ficam em `backend/storage/public-demo/`, ignorado pelo Git e separado do armazenamento padrão. Preserve o `.env` por canal privado e, se criar dados importantes nessa demonstração, faça backup cifrado com restauração verificada antes de trocar de computador; eles não são enviados ao Git. Para parar e manter os dados:
+
+```powershell
+docker compose --env-file .env -p botanicalessence-public-demo -f docker-compose.yml -f docker-compose.demo-data.yml -f docker-compose.hub.yml stop
+```
+
+Para retomar, repita o comando `up` acima. Não use `down --volumes`: ele apaga o banco dessa demonstração. As imagens são da versão `317cb51`; para desenvolver e executar alterações do código local, use o fluxo de build a seguir, sem `docker-compose.hub.yml`.
+
+## Executar com Docker a partir do código local
 
 1. Crie o arquivo de ambiente:
 

@@ -1,0 +1,26 @@
+# Use after docker-compose.yml AND docker-compose.demo-data.yml.
+# Published demo release only; source changes require the normal build workflow.
+services:
+  frontend:
+    image: andrerapela/botanical_essence:frontend-317cb51@sha256:643c14de6993d1e8d8fa5c9ad63d5e9312b55e93bd5f22a86dce8b756d4866c1
+    build: !reset null
+
+  backend:
+    image: andrerapela/botanical_essence:backend-317cb51@sha256:5928eb8195e7ea1e71ea7132507aac4e5d67322ec76fe8512c9709281c5aa4d0
+    build: !reset null
+    volumes:
+      - type: bind
+        source: ./backend/storage/public-demo
+        target: /var/www/html/storage
+        bind:
+          create_host_path: false
+
+  payment-operations:
+    image: andrerapela/botanical_essence:backend-317cb51@sha256:5928eb8195e7ea1e71ea7132507aac4e5d67322ec76fe8512c9709281c5aa4d0
+    build: !reset null
+    volumes:
+      - type: bind
+        source: ./backend/storage/public-demo
+        target: /var/www/html/storage
+        bind:
+          create_host_path: false
