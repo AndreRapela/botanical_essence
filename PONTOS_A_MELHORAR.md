@@ -172,7 +172,15 @@ O principal gap agora é transformar essa base técnica em uma operação de mar
 
 ### P3 — Melhoria contínua
 
-#### 19. Shell principal ainda concentra muita coordenação
+#### 19. Notificações financeiras antigas precisam de resolução durável
+
+**Evidência:** PaymentOperationsService tem validações específicas para algumas mensagens de reembolso, mas a SECURITY_AUDIT.md ainda lista como pendente o tratamento durável de mensagens cujo conteúdo deixou de representar o estado financeiro atual.
+
+**Impacto:** uma mensagem pode continuar pendente enquanto conciliação, estorno ou reversão altera o estado da compra. Sem uma regra geral de cancelamento/substituição e uma fila visível de resolução, a operação depende de perceber o caso e agir manualmente.
+
+**Melhoria:** antes de enviar, revalidar o estado e a versão da operação financeira a que a mensagem se refere; cancelar ou substituir mensagens superadas por uma comunicação correta; registrar o motivo e expor casos sem resolução no painel operacional.
+
+#### 20. Shell principal ainda concentra muita coordenação
 
 **Evidência:** apesar das extrações documentadas em SECURITY_AUDIT.md, src/app/app.component.ts ainda centraliza navegação e efeitos de interface; src/app/app.component.html tem 666 linhas e src/app/app.component.css tem 770 linhas. Parte dos fluxos depende de métodos delegadores do componente.
 
@@ -180,7 +188,7 @@ O principal gap agora é transformar essa base técnica em uma operação de mar
 
 **Melhoria:** continuar extraindo fronteiras por domínio/rota, manter estado e efeitos com contratos pequenos e medir tamanho/complexidade no quality gate. Fazer isso incrementalmente, preservando testes visuais existentes.
 
-#### 20. A prova automatizada é extensa, mas não substitui carga e avaliação independente
+#### 21. A prova automatizada é extensa, mas não substitui carga e avaliação independente
 
 **Evidência:** README.md e SECURITY_AUDIT.md documentam testes unitários, API, E2E, varreduras axe e fluxos financeiros em ambientes descartáveis; a própria auditoria registra que ainda faltam teste de carga e pentest/DAST independente.
 
