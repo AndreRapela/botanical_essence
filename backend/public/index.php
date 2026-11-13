@@ -224,6 +224,22 @@ try {
     $router->add('GET', '/api/admin/contact-messages', static fn (): array => $messages->adminContactMessages($_GET, $auth->requireRole('admin')));
     $router->add('POST', '/api/admin/contact-messages/status', static fn (): array => $messages->updateContactMessage(Request::json(), $auth->requireRole('admin')));
 
+    $paymentMutation = $method === 'POST' && (
+        $path === '/api/orders'
+        || $path === '/api/orders/withdrawal'
+        || str_starts_with($path, '/api/payments/')
+        || in_array($path, [
+            '/api/admin/refund-reconciliation/resolve',
+            '/api/admin/payment-notifications/retry',
+            '/api/admin/orders/refund',
+            '/api/admin/orders/cancel',
+            '/api/admin/withdrawals/action',
+        ], true)
+    );
+    if ($paymentMutation) {
+        PaymentPolicy::assertPaymentsEnabled();
+    }
+
     if ($method === 'POST' && $path !== '/api/payments/webhook') {
         Csrf::assertValid();
     }

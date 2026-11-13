@@ -90,6 +90,7 @@ final class PaymentService
 
     public function runPaymentOperationsBatch(int $limit = 50): array
     {
+        PaymentPolicy::assertPaymentsEnabled();
         return $this->operations->runBatch($limit);
     }
 

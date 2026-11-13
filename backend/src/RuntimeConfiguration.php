@@ -25,7 +25,7 @@ final class RuntimeConfiguration
         self::assertDatabaseCredentials($environment);
 
         if (in_array($environment, ['staging', 'production'], true)
-            && $paymentMode !== PaymentPolicy::MODE_LOCAL_SIMULATION) {
+            && !in_array($paymentMode, [PaymentPolicy::MODE_LOCAL_SIMULATION, PaymentPolicy::MODE_PAYMENTS_DISABLED], true)) {
             self::assertStripeIntegrationConfigured($environment);
         }
     }

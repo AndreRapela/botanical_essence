@@ -246,8 +246,9 @@ O destino, a chave, retenção, cópia off-site, agendamento e alertas continuam
 
 ## Pagamentos de teste e Stripe
 
-Há três modos explícitos, selecionados por `PAYMENT_EXECUTION_MODE`:
+Há quatro modos explícitos, selecionados por `PAYMENT_EXECUTION_MODE`:
 
+- `payments_disabled`: mantém o catálogo e as demais funções da aplicação disponíveis, mas bloqueia checkout, webhooks, reembolsos e saques. Pode ser usado em staging/production enquanto a integração Stripe ainda não está configurada.
 - `local_simulation`: somente em `APP_ENV=development`. O produto indicado por `PAYMENT_TEST_PRODUCT_SLUG` custa €0,01/US$0,01, o frete de teste é grátis e a compra é marcada como simulada. Não chama a Stripe e não testa Checkout, autenticação, webhooks ou reembolsos.
 - `stripe_test`: usa a chave `sk_test_...` e percorre o Checkout hospedado, a confirmação/webhook e o fluxo de teste do PSP. Os preços e o frete normais são usados; o total precisa atender aos limites definidos para a conta. A Stripe não movimenta dinheiro real em test mode.
 - `stripe_live`: somente em `APP_ENV=production`, com chave `sk_live_...`; cobranças reais ficam habilitadas.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 final class PaymentPolicy
 {
     public const MODE_LOCAL_SIMULATION = 'local_simulation';
+    public const MODE_PAYMENTS_DISABLED = 'payments_disabled';
     public const MODE_STRIPE_TEST = 'stripe_test';
     public const MODE_STRIPE_LIVE = 'stripe_live';
     public const STRIPE_CHECKOUT_IDEMPOTENCY_REPLAY_SECONDS = 23 * 60 * 60;
@@ -41,8 +42,8 @@ final class PaymentPolicy
                 : ($environment === 'production' ? self::MODE_STRIPE_LIVE : self::MODE_STRIPE_TEST);
         }
 
-        if (!in_array($mode, [self::MODE_LOCAL_SIMULATION, self::MODE_STRIPE_TEST, self::MODE_STRIPE_LIVE], true)) {
-            throw new HttpException('PAYMENT_EXECUTION_MODE inválido. Use local_simulation, stripe_test ou stripe_live.', 503, [], 'invalid_payment_mode');
+        if (!in_array($mode, [self::MODE_LOCAL_SIMULATION, self::MODE_PAYMENTS_DISABLED, self::MODE_STRIPE_TEST, self::MODE_STRIPE_LIVE], true)) {
+            throw new HttpException('PAYMENT_EXECUTION_MODE inválido. Use payments_disabled, local_simulation, stripe_test ou stripe_live.', 503, [], 'invalid_payment_mode');
         }
         self::expectedStripeLivemode($environment);
         if ($mode === self::MODE_LOCAL_SIMULATION && $environment !== 'development') {
@@ -60,6 +61,18 @@ final class PaymentPolicy
     public static function localSimulationEnabled(): bool
     {
         return self::executionMode() === self::MODE_LOCAL_SIMULATION;
+    }
+
+    public static function paymentsEnabled(): bool
+    {
+        return self::executionMode() !== self::MODE_PAYMENTS_DISABLED;
+    }
+
+    public static function assertPaymentsEnabled(): void
+    {
+        if (!self::paymentsEnabled()) {
+            throw new HttpException('Pagamentos ainda não estão habilitados neste site.', 503, [], 'payments_disabled');
+        }
     }
 
     /** @deprecated Use localSimulationEnabled() to make the no-PSP behavior explicit. */
