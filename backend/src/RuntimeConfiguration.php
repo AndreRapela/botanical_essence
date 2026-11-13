@@ -229,13 +229,13 @@ final class RuntimeConfiguration
         if (!preg_match('/^[A-Za-z0-9_]{1,64}$/D', $database)
             || !preg_match('/^[A-Za-z0-9_]{1,32}$/D', $username)
             || in_array(strtolower($username), ['root', 'admin', 'mysql'], true)
-            || strlen($password) < 32
-            || count(array_unique(str_split($password))) < 12
+            || strlen($password) < 8
+            || count(array_unique(str_split($password))) < 7
             || preg_match('/[\x00-\x20\x7f]/', $password)
             || $knownPlaceholder
             || hash_equals($password, $username)
             || hash_equals($password, $database)) {
-            throw new HttpException('Configure nome de banco/usuário dedicados e uma senha de aplicação aleatória com ao menos 32 caracteres antes de iniciar staging ou production.', 503, [], 'unsafe_database_credentials');
+            throw new HttpException('Configure nome de banco/usuário dedicados e uma senha de aplicação aleatória com ao menos 8 caracteres e 7 caracteres distintos antes de iniciar staging ou production.', 503, [], 'unsafe_database_credentials');
         }
     }
 
