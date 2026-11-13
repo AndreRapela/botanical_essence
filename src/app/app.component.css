@@ -1,6 +1,5 @@
 :host { display: block; min-height: 100vh; overflow-x: hidden; }
 
-button { border: 0; background: none; cursor: pointer; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .exact-logo { aspect-ratio: 1; background-image: url('/assets/logo-botanical-crest.webp'); background-position: center; background-repeat: no-repeat; background-size: 112% auto; display: block; flex: none; }
 .site-shell { min-height: 100vh; background: var(--paper); overflow: hidden; }
